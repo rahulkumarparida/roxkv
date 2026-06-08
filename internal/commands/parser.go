@@ -27,14 +27,20 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 			fmt.Println("Some Error occured")
 		}
 	case "DEL","del","Del":
-		return false
+		val := DelCommand(store,data)
+		if val {
+			fmt.Println("Removed the value")
+		}else{
+			fmt.Println("No Such value found")
+		}
 	case "KEYS","keys","Keys":
-		return false
+		dataItems := KeysCommand(store)
+		fmt.Println("The List of keys avaliable: ", dataItems)
 	default:
 		return "Command Not Found"
 	}
 
-	return "Check Man page"
+	return ""
 } 
 
 
@@ -59,4 +65,23 @@ func GetCommand(stre *store.MemoryAlloc ,data []string) any{
 	dataVal := store.GetKv(stre , data[0])
 
 	return  dataVal
+}
+
+
+func DelCommand(stre *store.MemoryAlloc ,data []string) bool{
+	if len(data) != 1  {
+		fmt.Println("Check Man page")
+	}
+
+	dataVal := store.DelKv(stre , data[0])
+
+	return  dataVal
+}
+
+
+func KeysCommand(stre *store.MemoryAlloc) []string{
+	data := store.KeyKv(stre)
+
+	return data
+	
 }
