@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/rahulkumarparida/roxkv/internal/persistence"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 )
 
@@ -36,6 +37,9 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 	case "KEYS","keys","Keys":
 		dataItems := KeysCommand(store)
 		fmt.Println("The List of keys avaliable: ", dataItems)
+	case "SAVE","Save","save":
+		datamsg := SaveCommand(store)
+		fmt.Println(datamsg)
 	default:
 		return "Command Not Found"
 	}
@@ -45,12 +49,10 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 
 
 func SetCommand(stre *store.MemoryAlloc ,data []string) bool{
-	if len(data) != 2  {
-		fmt.Println("Check Man page")
-	}
+	
 	dataItems := store.Item{
 		Key: data[0],
-		Val: data[1]}
+		Val: data[1:]}
 
 	store.SetKv(stre , &dataItems)
 	
@@ -84,4 +86,20 @@ func KeysCommand(stre *store.MemoryAlloc) []string{
 
 	return data
 	
+}
+
+func SaveCommand(stre *store.MemoryAlloc) string{
+	
+	keys := store.KeyKv(stre)
+	fmt.Println("Keys:", keys)
+	for _, key := range keys {
+		
+		rawdata := store.GetKv(stre,key)
+
+		val := persistence.StoreToJson(rawdata)
+		fmt.Println("Saving: ", val)
+	}
+
+
+	return "Saved"
 }

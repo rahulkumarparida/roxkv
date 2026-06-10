@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -33,18 +32,17 @@ func (ma *MemoryAlloc) Set(kv Item) {
 
 
 // This 
-func (ma *MemoryAlloc) Get(key string) (string,bool){
+func (ma *MemoryAlloc) Get(key string) (Item,bool){
 	ma.Mu.RLock()
 	defer ma.Mu.RUnlock()
 
 	data , exist := ma.Data[key]
 
 	if !exist {
-		return "Data does not exists" ,false
+		return Item{} ,false
 	}
 
-	strVal := fmt.Sprintf("%v", data)
-	return strVal , true
+	return data , true
 
 }
 
@@ -101,7 +99,7 @@ func SetKv(store *MemoryAlloc,kv *Item ){
 }
 
 // Retieves the similar value from the memory and sends it back
-func GetKv(store *MemoryAlloc, key string) string{
+func GetKv(store *MemoryAlloc, key string) Item{
 
 	data , exists := store.Get(key)
 
