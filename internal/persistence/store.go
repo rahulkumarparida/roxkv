@@ -37,7 +37,6 @@ func CreateFile(data store.Item, absoluteFilePath string)  bool{
 
 func StoreToJson(kv store.Item) bool{
 	dbFolder := utils.DbFolder()
-	fmt.Println("FolderPath: ", dbFolder)
 	if len(dbFolder) == 0 {	
 		return false
 	}
@@ -69,17 +68,17 @@ func StoreToJson(kv store.Item) bool{
 
 func LoadJsons(ms *store.MemoryAlloc) int{
 	dbFolder := utils.DbFolder()
-	fmt.Println("FolderPath: ", dbFolder)
+	count := 1
 	if len(dbFolder) == 0 {	
 		fmt.Println("Home directory not found")
-		return 0
+		return count
 	}
 
 	// Retieves all file form the path stores in an slice
 	allFiles , err := os.ReadDir(dbFolder)
 	
 	if utils.HandleError("Error while reading the files", err) {
-		return 0
+		return count
 	}
 
 	// Loops through all the files to get the data 
@@ -98,7 +97,8 @@ func LoadJsons(ms *store.MemoryAlloc) int{
 		var data store.Item
 		err = json.Unmarshal(databytes , &data)
 		store.SetKv(ms , &data)
+		count++
 	}
 
-	return 1
+	return count
 }

@@ -3,8 +3,10 @@ package commands
 import (
 	"fmt"
 
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/persistence"
 	"github.com/rahulkumarparida/roxkv/internal/store"
+	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
 func ParseCommands(store *store.MemoryAlloc,input []string) any{
@@ -40,8 +42,15 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 	case "SAVE","Save","save":
 		datamsg := SaveCommand(store)
 		fmt.Println(datamsg)
+	case "LOAD","Load","load":
+		count := LoaderCommand(store)
+		fmt.Println("Restored: ", count , " Keys")
+	case "HISTORY","History","history":
+		history:= HistoryCommand()
+		fmt.Println(history)
 	default:
-		return "Command Not Found"
+		logger.ErrorLog(input[0]+" command not found")
+		fmt.Println("Command Not Found,Check the man page")
 	}
 
 	return ""
@@ -99,7 +108,25 @@ func SaveCommand(stre *store.MemoryAlloc) string{
 		val := persistence.StoreToJson(rawdata)
 		fmt.Println("Saving: ", val)
 	}
-
-
+	logmsg:= "All keys avaliable in RAM till are saved to DB"
+	logger.SucessLog(logmsg)
 	return "Saved"
+}
+
+func LoaderCommand(stre *store.MemoryAlloc) int{
+	logmsg:= "All keys avaliable in DB are loaded to RAM"
+	logger.SucessLog(logmsg)
+	count := persistence.LoadJsons(stre)
+	return count
+}
+
+func HistoryCommand() string{
+
+	data , err := logger.ReadFromFile()
+
+	if utils.HandleError("Error while reading from file",err) {
+		return "\n"
+	}
+
+	return  data
 }

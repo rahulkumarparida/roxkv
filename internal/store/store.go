@@ -2,6 +2,8 @@ package store
 
 import (
 	"sync"
+
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 )
 
 // The structure of the value to be stored
@@ -27,6 +29,7 @@ func (ma *MemoryAlloc) Set(kv Item) {
 	ma.Data[kv.Key] = Item{
 		kv.Key,
 		kv.Val}
+	logger.SucessLog(kv.Key + " added to the memory")
 
 }
 
@@ -39,6 +42,7 @@ func (ma *MemoryAlloc) Get(key string) (Item,bool){
 	data , exist := ma.Data[key]
 
 	if !exist {
+		logger.InfoLog("Key does not exists")
 		return Item{} ,false
 	}
 
@@ -54,10 +58,12 @@ func (ma *MemoryAlloc) Del(key string) (bool){
 	_ , exist  := ma.Data[key]
 
 	if !exist {
+		logger.InfoLog("Key does not exists")
 		return  true
 	}
 	// Because  it is a map  it can store multtiple valuse so we dont want to harm other values insteda of the key value
 	delete(ma.Data,key)
+	logger.InfoLog("Deleted Key "+key)
 	
 	return  true
 
@@ -75,7 +81,7 @@ func (ma *MemoryAlloc) Keys() []string{
 	for k := range data{
 		keys = append(keys, k)
 	}
-
+	logger.InfoLog("All keys summoned")
 	return  keys
 }
 
