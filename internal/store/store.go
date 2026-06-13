@@ -1,15 +1,21 @@
 package store
 
 import (
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/logger"
+	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
 // The structure of the value to be stored
 type Item struct {
 	Key string
 	Val any
+	Expiry bool
+	Ttl time.Time
 }
 
 // This one struturizes on how the data wil be stored and allocated
@@ -25,10 +31,12 @@ func (ma *MemoryAlloc) Set(kv Item) {
 
 	ma.Mu.Lock()
 	defer ma.Mu.Unlock()
-
+	
 	ma.Data[kv.Key] = Item{
 		kv.Key,
-		kv.Val}
+		kv.Val,
+		kv.Expiry,
+		kv.Ttl}
 	logger.SucessLog(kv.Key + " added to the memory")
 
 }
@@ -78,7 +86,11 @@ func (ma *MemoryAlloc) Keys() []string{
 		return []string{}
 	}
 
-	for k := range data{
+	for k , d := range data{
+		if d.Expiry && d.Ttl.Before(time.Now()) {
+			DelKv(ma, d.Key)
+			continue
+		}
 		keys = append(keys, k)
 	}
 	logger.InfoLog("All keys summoned")
@@ -95,13 +107,45 @@ func StoreInMemory() (*MemoryAlloc){
 	return store
 }
 
+func evaluatetime(ttl int,dur string) time.Time{
+	
+	
+	switch strings.ToLower(dur) {
+		case "second","sec":
+			return time.Now().Add(time.Duration(ttl) * time.Second)
+		case "minutes","min":
+			return time.Now().Add(time.Duration(ttl) * time.Minute)
+		case "hour","hh":
+			return time.Now().Add(time.Duration(ttl) * time.Hour)
+		default:
+			return time.Now()
+	}
+}
 
 // Uses the function from MemoryAlloc and kv Item struct to Set a variable
-func SetKv(store *MemoryAlloc,kv *Item ){	
-	values := Item{kv.Key,kv.Val}
+func SetKv(store *MemoryAlloc,kv *Item, stripTtl []string) bool{	
+	var futureTime time.Time = time.Now()
+	if kv.Expiry {
+		if stripTtl[0] == "" || stripTtl[1] == "" {
+			logger.ErrorLog("--ttl arguments not provided please check the man page for arguments")
+			return  false
+		}
+			var timetoAdd , err = strconv.Atoi(stripTtl[0]) // time like 12 ,13 ,14
+
+		if utils.HandleError("Error while parsing time provided", err){
+			return false
+		}
+
+		var duration = stripTtl[1] // duration like sec , min, hr
+
+		 futureTime = evaluatetime(timetoAdd,duration)
+	}
+
+
+	values := Item{kv.Key,kv.Val,kv.Expiry,futureTime}
 
 	store.Set(values)
-
+	return  true
 }
 
 // Retieves the similar value from the memory and sends it back
@@ -111,6 +155,11 @@ func GetKv(store *MemoryAlloc, key string) Item{
 
 	if !exists{
 		return data
+	}
+
+	if data.Expiry && data.Ttl.Before(time.Now()) {
+		DelKv(store, data.Key)
+		return Item{"Exxpired","Key has exprired", false,time.Now()}
 	}
 
 	return data
@@ -131,6 +180,7 @@ func DelKv(store *MemoryAlloc,key string) bool{
 func KeyKv(store *MemoryAlloc) []string{
 	
 	data := store.Keys()
+	
 
 	return data
 }

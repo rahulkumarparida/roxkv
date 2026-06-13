@@ -34,7 +34,6 @@ func WriteToFile(msg string) string{
 		return "" 
 	}
 	defer file.Close()	
-	fmt.Println("Sucess")
 
 	return logFile
 

@@ -96,7 +96,7 @@ func LoadJsons(ms *store.MemoryAlloc) int{
 		}
 		var data store.Item
 		err = json.Unmarshal(databytes , &data)
-		store.SetKv(ms , &data)
+		store.SetKv(ms , &data , []string{"",""})
 		count++
 	}
 

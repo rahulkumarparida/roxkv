@@ -2,6 +2,8 @@ package commands
 
 import (
 	"fmt"
+	"slices"
+	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/persistence"
@@ -58,12 +60,46 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 
 
 func SetCommand(stre *store.MemoryAlloc ,data []string) bool{
-	
-	dataItems := store.Item{
-		Key: data[0],
-		Val: data[1:]}
+	var dataItems store.Item
+	var inpData []string
+	var stripTtl []string
 
-	store.SetKv(stre , &dataItems)
+	if len(data[1:]) <= 0 {
+		logger.ErrorLog("Provided empty value in the key value pair")
+			fmt.Println("Empty value provided")
+			return false
+		
+	}
+
+	if slices.Contains(data,"--ttl") {
+		sliceFrom := slices.Index(data,"--ttl")
+		stripTtl = data[sliceFrom+1:]
+		if len(stripTtl) > 2 {
+			logger.ErrorLog("2 Args after the --ttl flag")
+			fmt.Println("Only 2 args after --ttl")
+			return false
+		}
+		dataItems = store.Item{
+			Key: data[0],
+			Val: data[1:sliceFrom],
+			Expiry: true,
+			Ttl: time.Now(),
+		}
+
+	}else{
+		inpData = data[1:]
+		stripTtl = []string{"",""} 
+		dataItems = store.Item{
+			Key: data[0],
+			Val: inpData,
+			Expiry: false,
+			Ttl: time.Now(),
+		}
+	}
+	
+	
+
+	store.SetKv(stre , &dataItems , stripTtl)
 	
 	return true
 }
@@ -75,7 +111,7 @@ func GetCommand(stre *store.MemoryAlloc ,data []string) any{
 
 	dataVal := store.GetKv(stre , data[0])
 
-	return  dataVal
+	return  dataVal.Val
 }
 
 

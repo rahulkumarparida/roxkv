@@ -10,13 +10,7 @@ import (
 
 
 func main(){
-	// Accespt the arguments but from UI
-	// Starts from command Roxkv
-	// Initializes CLI
-	// roxkv > SET name rahul
-	// rahul
-	// roxkv > GET name
-	// rahul  
+ 
 
 	args := os.Args
 
