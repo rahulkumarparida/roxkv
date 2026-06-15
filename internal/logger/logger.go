@@ -47,7 +47,7 @@ func ReadFromFile() (string, error){
 	}
 	
 	files, err := os.ReadDir(path)
-	if utils.HandleError("Error while reading from file",err) {
+	if err != nil {
 		return "" , err
 	}
 
@@ -58,7 +58,7 @@ func ReadFromFile() (string, error){
 			continue
 		}
 		info , err := file.Info()
-		if utils.HandleError("Error while reading from file",err) {
+		if err != nil {
 		return "" , err
 		}
 

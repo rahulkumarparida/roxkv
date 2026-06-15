@@ -133,6 +133,7 @@ func SetKv(store *MemoryAlloc,kv *Item, stripTtl []string) bool{
 			var timetoAdd , err = strconv.Atoi(stripTtl[0]) // time like 12 ,13 ,14
 
 		if utils.HandleError("Error while parsing time provided", err){
+			logger.ErrorLog("Parsing failed while parsing the time. Integre required")
 			return false
 		}
 

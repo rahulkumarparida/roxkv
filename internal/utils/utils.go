@@ -1,9 +1,13 @@
 package utils
 
-import "log"
+import (
+	"log"
+
+)
 
 
 func HandleError(errmsg string, err error) bool {
+	
 	if err != nil {
 		log.Println(errmsg, err) 
 		return true         

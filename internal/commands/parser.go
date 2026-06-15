@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"time"
 
@@ -58,6 +59,44 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 	return ""
 } 
 
+func ParseInput(data []string) []string{
+	var dataAppended []string
+	re := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+
+	var startWord bool = false
+	var tempWord string
+	for _, v := range data {
+		
+		if len(v) == 0 {
+			continue
+		}
+
+		if !startWord && (v[0] == '\'' || v[0] == '"' || v[0] == '`' ) {
+				startWord = true
+				tempWord += v
+				continue
+		}
+		if startWord || v[len(v)-1] == '\'' || v[len(v)-1] ==  '"' || v[len(v)-1] == '`'  {
+				tempWord +=" " + v
+				if v[len(v)-1] == '\'' || v[len(v)-1] ==  '"' || v[len(v)-1] == '`'  {
+					dataAppended = append(dataAppended, tempWord)
+					startWord = false	
+					tempWord = ""
+				}
+				
+				continue
+		}
+
+		if !startWord && re.MatchString(v) {
+				dataAppended = append(dataAppended, v)
+				
+		}
+	}
+
+	return dataAppended
+
+}
+
 
 func SetCommand(stre *store.MemoryAlloc ,data []string) bool{
 	var dataItems store.Item
@@ -81,7 +120,7 @@ func SetCommand(stre *store.MemoryAlloc ,data []string) bool{
 		}
 		dataItems = store.Item{
 			Key: data[0],
-			Val: data[1:sliceFrom],
+			Val: ParseInput(data[1:sliceFrom]),
 			Expiry: true,
 			Ttl: time.Now(),
 		}
@@ -91,7 +130,7 @@ func SetCommand(stre *store.MemoryAlloc ,data []string) bool{
 		stripTtl = []string{"",""} 
 		dataItems = store.Item{
 			Key: data[0],
-			Val: inpData,
+			Val: ParseInput(inpData),
 			Expiry: false,
 			Ttl: time.Now(),
 		}
@@ -137,13 +176,16 @@ func SaveCommand(stre *store.MemoryAlloc) string{
 	
 	keys := store.KeyKv(stre)
 	fmt.Println("Keys:", keys)
+	var allData []store.Item
 	for _, key := range keys {
 		
 		rawdata := store.GetKv(stre,key)
+		allData = append(allData, rawdata)
 
-		val := persistence.StoreToJson(rawdata)
-		fmt.Println("Saving: ", val)
+		
 	}
+	val := persistence.StoreToJson(allData)
+	fmt.Println("Saving: ", val)
 	logmsg:= "All keys avaliable in RAM till are saved to DB"
 	logger.SucessLog(logmsg)
 	return "Saved"
