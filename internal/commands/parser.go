@@ -121,7 +121,6 @@ func SetCommand(stre *store.MemoryAlloc ,data []string) bool{
 		dataItems = store.Item{
 			Key: data[0],
 			Val: ParseInput(data[1:sliceFrom]),
-			Expiry: true,
 			Ttl: time.Now(),
 		}
 
@@ -131,8 +130,7 @@ func SetCommand(stre *store.MemoryAlloc ,data []string) bool{
 		dataItems = store.Item{
 			Key: data[0],
 			Val: ParseInput(inpData),
-			Expiry: false,
-			Ttl: time.Now(),
+			Ttl: time.Time{},
 		}
 	}
 	

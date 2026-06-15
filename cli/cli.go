@@ -9,6 +9,7 @@ import (
 
 	"github.com/rahulkumarparida/roxkv/internal/commands"
 	"github.com/rahulkumarparida/roxkv/internal/store"
+	"github.com/rahulkumarparida/roxkv/internal/worker"
 )
 func CLIUI(){
 	
@@ -19,6 +20,7 @@ func CLIUI(){
 	store := store.StoreInMemory()
 
 	for{
+		worker.ExpiryWorker(store)
 		fmt.Print("roxkv > ")
 		if scanner.Scan() {
 			input = scanner.Text()

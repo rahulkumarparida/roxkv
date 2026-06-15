@@ -14,7 +14,6 @@ import (
 type Item struct {
 	Key string
 	Val any
-	Expiry bool
 	Ttl time.Time
 }
 
@@ -35,7 +34,6 @@ func (ma *MemoryAlloc) Set(kv Item) {
 	ma.Data[kv.Key] = Item{
 		kv.Key,
 		kv.Val,
-		kv.Expiry,
 		kv.Ttl}
 	logger.SucessLog(kv.Key + " added to the memory")
 
@@ -69,7 +67,7 @@ func (ma *MemoryAlloc) Del(key string) (bool){
 		logger.InfoLog("Key does not exists")
 		return  true
 	}
-	// Because  it is a map  it can store multtiple valuse so we dont want to harm other values insteda of the key value
+	// Because ma.Data is a array of map  it can store multtiple valuse so we dont want to harm other values insteda of the key value
 	delete(ma.Data,key)
 	logger.InfoLog("Deleted Key "+key)
 	
@@ -87,7 +85,7 @@ func (ma *MemoryAlloc) Keys() []string{
 	}
 
 	for k , d := range data{
-		if d.Expiry && d.Ttl.Before(time.Now()) {
+		if !d.Ttl.IsZero() && d.Ttl.Before(time.Now()) {
 			DelKv(ma, d.Key)
 			continue
 		}
@@ -124,8 +122,8 @@ func evaluatetime(ttl int,dur string) time.Time{
 
 // Uses the function from MemoryAlloc and kv Item struct to Set a variable
 func SetKv(store *MemoryAlloc,kv *Item, stripTtl []string) bool{	
-	var futureTime time.Time = time.Now()
-	if kv.Expiry {
+	var futureTime time.Time 
+	if !kv.Ttl.IsZero() {
 		if stripTtl[0] == "" || stripTtl[1] == "" {
 			logger.ErrorLog("--ttl arguments not provided please check the man page for arguments")
 			return  false
@@ -143,7 +141,7 @@ func SetKv(store *MemoryAlloc,kv *Item, stripTtl []string) bool{
 	}
 
 
-	values := Item{kv.Key,kv.Val,kv.Expiry,futureTime}
+	values := Item{kv.Key,kv.Val,futureTime}
 
 	store.Set(values)
 	return  true
@@ -158,9 +156,9 @@ func GetKv(store *MemoryAlloc, key string) Item{
 		return data
 	}
 
-	if data.Expiry && data.Ttl.Before(time.Now()) {
+	if !data.Ttl.IsZero() && data.Ttl.Before(time.Now()) {
 		DelKv(store, data.Key)
-		return Item{"Exxpired","Key has exprired", false,time.Now()}
+		return Item{"Exxpired","Key has exprired",time.Now()}
 	}
 
 	return data

@@ -38,10 +38,6 @@ func CreateFile(data []store.Item, absoluteFilePath string)  bool{
 	
 }
 
-//Create a func previous data where i can add previous data form the json so that it can be added accorindly
-// such that it should seregate by the time like difffrent time diffrent positoin of the Item in the araray
-// the oldest will be added first and then later will bw addded later so we cna get the latest values
-
 //Func to retireve the current dates data
 func retreiveData(fileName string , data []store.Item) []store.Item{
 
