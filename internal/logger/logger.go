@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -39,7 +40,7 @@ func WriteToFile(msg string) string{
 
 }
 
-func ReadFromFile() (string, error){
+func ReadFromFile(flag string) (string, error){
 	path := utils.LogFolder()
 	if path == "" {
 		fmt.Printf("No history has been recorded")
@@ -74,7 +75,55 @@ func ReadFromFile() (string, error){
 
 	data := string(databytes)
 
-	return data , nil
+	switch flag {
+	case "--all":
+		return data , nil
+	case "--success":
+		var appendata string
+		splitData := strings.Split(data, "\n")
+
+		for _, line := range splitData {
+
+			if strings.HasPrefix(line,"SUCCESS") {
+				appendata +="\n"+ line
+			}
+
+		}
+
+		return  appendata , nil
+	
+	case "--error":
+		var appendata string
+		splitData := strings.Split(data, "\n")
+
+		for _, line := range splitData {
+
+			if strings.HasPrefix(line,"ERROR") {
+				appendata +="\n"+ line
+			}
+
+		}
+
+		return  appendata , nil
+
+	case "--info":
+		var appendata string
+		splitData := strings.Split(data, "\n")
+
+		for _, line := range splitData {
+
+			if strings.HasPrefix(line,"INFO") {
+				appendata +="\n"+ line
+			}
+
+		}
+
+		return  appendata , nil
+
+	default:
+		fmt.Println("\nNo such command found \n Try these:\nhistory\nhistory --success\nhistory --error\nhistory --info")
+		return  "\n",nil
+	}
 
 }
 

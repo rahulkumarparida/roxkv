@@ -1,0 +1,86 @@
+# RoxKV - Lightweight Key Value Store
+
+Hello there! 👋
+
+Welcome to RoxKV, a lightweight key-value database written in Go by Rahul Kumar Parida.
+
+RoxKV started as a learning project to understand how databases, storage engines, parsers, persistence layers, background workers, and concurrency work under the hood. Over time it has evolved into a small but capable key-value store with support for persistence, expiration, logging, and custom command parsing.
+
+## Current Features
+
+• Store key-value pairs in memory
+
+• Optional TTL (Time To Live) support
+
+```
+  set token abc123 --ttl 30 min
+```
+
+• Automatic expiry worker that removes expired keys
+
+• Persistent storage using daily snapshot files
+
+• Load snapshots from oldest to newest, ensuring the latest values overwrite older ones
+
+• Command history and logging system
+
+• Filter logs using:
+
+```
+  history
+  history --success
+  history --error
+```
+
+• Custom parser supporting:
+
+```
+  "double quotes"
+  'single quotes'
+  `backticks`
+```
+
+• Thread-safe storage using read-write mutexes
+
+## What's Next?
+
+Planned features include:
+
+• TCP server support
+• Multi-client access
+• Message broker / queue system
+• Additional persistence improvements
+• Better tooling and developer experience
+
+## Documentation
+
+To view the complete command reference:
+
+```
+  roxkv man
+```
+
+or
+
+```
+  man roxkv
+```
+
+## Support the Author
+
+If RoxKV helped you learn something, inspired a project, or was simply fun to use, feel free to let me know.
+
+Instagram:
+https://www.instagram.com/rahulroxx460
+
+X (Twitter):
+https://x.com/rahulkuparida
+
+GitHub:
+https://github.com/rahulkumarparida
+
+Every message, issue, star, or contribution helps keep the project moving forward.
+
+Built with Go, curiosity, and a lot of debugging.
+
+* Rahul Kumar Parida

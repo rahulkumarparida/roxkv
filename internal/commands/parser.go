@@ -49,7 +49,7 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 		count := LoaderCommand(store)
 		fmt.Println("Restored: ", count , " Keys")
 	case "HISTORY","History","history":
-		history:= HistoryCommand()
+		history:= HistoryCommand(data)
 		fmt.Println(history)
 	default:
 		logger.ErrorLog(input[0]+" command not found")
@@ -178,7 +178,9 @@ func SaveCommand(stre *store.MemoryAlloc) string{
 	for _, key := range keys {
 		
 		rawdata := store.GetKv(stre,key)
-		allData = append(allData, rawdata)
+		if rawdata.Ttl.IsZero() {
+			allData = append(allData, rawdata)	
+		}
 
 		
 	}
@@ -196,13 +198,28 @@ func LoaderCommand(stre *store.MemoryAlloc) int{
 	return count
 }
 
-func HistoryCommand() string{
+func HistoryCommand(args []string) string{
 
-	data , err := logger.ReadFromFile()
+	if len(args) == 0 || len(args) > 1 {
+		
+
+		data , err := logger.ReadFromFile("--all")
+
+		if utils.HandleError("Error while reading from file",err) {
+			return "\n"
+		}
+
+		return  data
+
+	}
+
+	data , err := logger.ReadFromFile(args[0])
 
 	if utils.HandleError("Error while reading from file",err) {
-		return "\n"
+			return "\n"
 	}
 
 	return  data
+
+
 }
