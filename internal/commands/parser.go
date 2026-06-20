@@ -25,38 +25,49 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 	case "GET","get","Get":
 		val := GetCommand(store,data)
 		fmt.Println(val)
+		return  val
 	case "SET","set","Set":
 		 val:= SetCommand(store,data)
 		 if val {
 			fmt.Println("Added the KeyValue")
+			return  val
 		}else{
 			fmt.Println("Some Error occured")
+			return  val
 		}
 	case "DEL","del","Del":
 		val := DelCommand(store,data)
 		if val {
 			fmt.Println("Removed the value")
+			return  val
 		}else{
 			fmt.Println("No Such value found")
+			return  val
 		}
 	case "KEYS","keys","Keys":
 		dataItems := KeysCommand(store)
 		fmt.Println("The List of keys avaliable: ", dataItems)
+		return  dataItems
 	case "SAVE","Save","save":
 		datamsg := SaveCommand(store)
 		fmt.Println(datamsg)
+		return  datamsg
 	case "LOAD","Load","load":
 		count := LoaderCommand(store)
 		fmt.Println("Restored: ", count , " Keys")
+		return  count
 	case "HISTORY","History","history":
 		history:= HistoryCommand(data)
 		fmt.Println(history)
+		return history
 	default:
 		logger.ErrorLog(input[0]+" command not found")
 		fmt.Println("Command Not Found,Check the man page")
+		
+		return "Error"
 	}
 
-	return ""
+	
 } 
 
 func ParseInput(data []string) []string{

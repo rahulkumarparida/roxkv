@@ -22,6 +22,8 @@ func CLIUI(){
 	for{
 		worker.ExpiryWorker(store)
 		fmt.Print("roxkv > ")
+		
+		
 		if scanner.Scan() {
 			input = scanner.Text()
 		}else {
