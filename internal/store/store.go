@@ -156,10 +156,11 @@ func GetKv(store *MemoryAlloc, key string) Item{
 		return data
 	}
 
-	if !data.Ttl.IsZero() && data.Ttl.Before(time.Now()) {
-		DelKv(store, data.Key)
-		return Item{"Exxpired","Key has exprired",time.Now()}
-	}
+
+	// if !data.Ttl.IsZero() && data.Ttl.Before(time.Now()) {
+	// 	DelKv(store, data.Key)
+	// 	return Item{"Exxpired","Key has exprired",time.Now()}
+	// }
 
 	return data
 }

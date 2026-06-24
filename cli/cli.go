@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 
@@ -12,15 +13,15 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/worker"
 )
 func CLIUI(){
-	
+	ctx , cancel := context.WithCancel(context.Background())
 	scanner := bufio.NewScanner(os.Stdin)
-	
+	defer cancel()
 	var input string
 
 	store := store.StoreInMemory()
 
 	for{
-		worker.ExpiryWorker(store)
+		worker.ExpiryWorker(ctx,store)
 		fmt.Print("roxkv > ")
 		
 		
@@ -28,11 +29,13 @@ func CLIUI(){
 			input = scanner.Text()
 		}else {
 			fmt.Println("Some error occured while scanning")
+			cancel()
 		}
 		comandArgs := strings.Fields(input)
 
 
 		if input == "q" {
+			cancel()
 			break
 		}
 

@@ -2,10 +2,14 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/commands"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
@@ -15,40 +19,116 @@ import (
 
 
 
-func handleConnection(conn net.Conn, store *store.MemoryAlloc) {
-	reader := bufio.NewReader(conn)
+const MaxConnections = 5
+type NewClient struct {
+	ID any
+	Conn net.Conn
+	LastUsed time.Time
+	ConnectedAt time.Time
+	Mu sync.RWMutex
+}
 
+func CreateClient(conn net.Conn) *NewClient{
+
+
+	return  &NewClient{
+		ID:conn.RemoteAddr().String(),
+		Conn: conn,
+		LastUsed: time.Now(),
+		ConnectedAt: time.Now(),
+		Mu: sync.RWMutex{},
+	}
+}
+
+var TotalConnecntions []*NewClient
+
+func DeleteClientListing(target *NewClient){
+	TotalConnecntions = slices.DeleteFunc(TotalConnecntions, func(n *NewClient) bool{
+
+		return n.ID == target.ID
+		 
+	})	
+
+}
+
+func handleConnection(client *NewClient, store *store.MemoryAlloc ) {
+	reader := bufio.NewReader(client.Conn)	
+	ctx , cancel := context.WithCancel(context.Background())	
+
+	msg := fmt.Sprintln("Total Users Connected: ", len(TotalConnecntions) )	
+	client.Conn.Write([]byte(msg))
+	
+	
 
 	for {
-		worker.ExpiryWorker(store)
 		input, err := reader.ReadString('\n')
-
-		if input == "q" || input == "exit" {
-
-			break
-		}
+		print(input)
+		go DeadOrAliveConnections(ctx,client)
+		go worker.ExpiryWorker(ctx,store)
+		
 
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("Client Disconnected")
+				fmt.Println("Client Disconnected:",err)
+				fmt.Println("Client name: ", client.ID )
 			} else {
 				fmt.Println("err:", err)
 				logger.ErrorLog("Error while reading data")
 			}
-			return
+			DeleteClientListing(client)
+			break
 		}
+
 		// Gets the data from type interface{}/any to string and then writes to byte
 		data := commands.ParseCommands(store,strings.Fields(input))
 		datastr := fmt.Sprintf("%v", data)
-		_, werr := conn.Write([]byte("roxkv> " + datastr + " \n" ))
+		_, werr := client.Conn.Write([]byte("roxkv> " + datastr + " \n" ))
+		client.LastUsed = time.Now()
 
 		if werr != nil {
 			fmt.Println("err:", werr)
 
 		}
-
+		
 	}
-	defer conn.Close()
+	
+	defer cancel()
+
+	DeleteClientListing(client)	
+	defer client.Conn.Close()
+}
+
+func ClearConnections(t time.Time,client *NewClient) {
+		if time.Since(client.LastUsed) > (5*time.Minute) {
+			fmt.Println("Client died: ", client.ID)
+			client.Conn.Write([]byte("Client was Inactive for too long \n" ))
+			client.Conn.Close()
+			DeleteClientListing(client)	
+			logger.InfoLog("Ticker worked at : "+ t.Format("2006-01-02 15:04:05")) 
+			
+		}
+}
+
+func DeadOrAliveConnections(ctx context.Context,client *NewClient){
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	
+	
+	
+		fmt.Println("Ticked")	
+		for{
+			select{
+			case <-ctx.Done():
+				return
+			case t := <-ticker.C:
+				ClearConnections(t,client)
+				
+
+
+			}
+		}
+	
+
 
 }
 
@@ -69,13 +149,30 @@ func Server() {
 
 		conn, err := listner.Accept()
 
+
+
+
+
 		if err != nil {
 			fmt.Println("Connection could not be established:", err)
 			logger.ErrorLog("Connection failed could not be established")
 			continue
 		}
 
-		go handleConnection(conn , store)
+		client := *CreateClient(conn)
+
+		if len(TotalConnecntions) > MaxConnections {
+			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
+			client.Conn.Close()
+			continue
+		}
+
+
+		TotalConnecntions = append(TotalConnecntions, &client)
+		fmt.Println("Connected: ", client.ID)
+		go handleConnection(&client , store )
+		
+
 
 	}
 
