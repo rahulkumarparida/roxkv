@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/logger"
@@ -30,10 +29,6 @@ func RemoveExpired(t time.Time,ms *store.MemoryAlloc){
 func ExpiryWorker(ctx context.Context,ms *store.MemoryAlloc) {
 	ticker := time.NewTicker(1*time.Second)
 	defer ticker.Stop()		
-	
-	
-	
-		fmt.Println("expirying")
 		for{
 
 			select{

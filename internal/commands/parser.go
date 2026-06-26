@@ -8,11 +8,12 @@ import (
 
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/persistence"
+	"github.com/rahulkumarparida/roxkv/internal/pubsub"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-func ParseCommands(store *store.MemoryAlloc,input []string) any{
+func ParseCommands(store *store.MemoryAlloc,input []string , client *utils.NewClient) any{
 	
 
 	if len(input)  == 0{
@@ -60,6 +61,12 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 		history:= HistoryCommand(data)
 		fmt.Println(history)
 		return history
+	case "SUBSCRIBE","Subscribe","subscribe":
+		val := SubscriberCommand(client,data)
+		return val
+	case "PUBLISH","Publish","publish":
+		PublishCommand(client,data)
+		
 	default:
 		logger.ErrorLog(input[0]+" command not found")
 		fmt.Println("Command Not Found,Check the man page")
@@ -67,7 +74,8 @@ func ParseCommands(store *store.MemoryAlloc,input []string) any{
 		return "Error"
 	}
 
-	
+	return ""
+
 } 
 
 func ParseInput(data []string) []string{
@@ -233,4 +241,23 @@ func HistoryCommand(args []string) string{
 	return  data
 
 
+}
+
+
+func SubscriberCommand(client *utils.NewClient, input []string) bool{
+
+	if input[0] == "" {
+		return false
+	}
+
+	val := pubsub.HandleSubscribers(client,input[0])
+	return val
+}
+
+func PublishCommand(client *utils.NewClient,input []string) any {
+	if input[0] == "" || input[1] == "" {
+		return "Channel name and then data is required, plase check thee help page or man for information."
+	}
+	pubsub.Broker(client,input[0],input[1])
+	return ""
 }

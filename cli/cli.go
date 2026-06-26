@@ -10,6 +10,7 @@ import (
 
 	"github.com/rahulkumarparida/roxkv/internal/commands"
 	"github.com/rahulkumarparida/roxkv/internal/store"
+	"github.com/rahulkumarparida/roxkv/internal/utils"
 	"github.com/rahulkumarparida/roxkv/internal/worker"
 )
 func CLIUI(){
@@ -38,8 +39,8 @@ func CLIUI(){
 			cancel()
 			break
 		}
-
-		commands.ParseCommands(store,comandArgs)
+		nullclient := utils.NewClient{}
+		commands.ParseCommands(store,comandArgs,&nullclient)
 
 
 	}
