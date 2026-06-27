@@ -13,6 +13,10 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
+func CheckInputLength(input []string, paramsrequired int)bool{
+	return len(input) == paramsrequired
+}
+
 func ParseCommands(store *store.MemoryAlloc,input []string , client *utils.NewClient) any{
 	
 
@@ -62,11 +66,32 @@ func ParseCommands(store *store.MemoryAlloc,input []string , client *utils.NewCl
 		fmt.Println(history)
 		return history
 	case "SUBSCRIBE","Subscribe","subscribe":
+		valid := CheckInputLength(data,1)
+		if !valid{
+			return false
+		}		
 		val := SubscriberCommand(client,data)
 		return val
 	case "PUBLISH","Publish","publish":
+		valid := CheckInputLength(data,2)
+		if !valid{
+			return false
+		}
 		PublishCommand(client,data)
-		
+	case "UNSUBSCRIBE","Unsubscribe","unsubscribe":
+		valid := CheckInputLength(data,1)
+		if !valid{
+			return false
+		}
+		UnsubscribeCommand(client,data)
+	case "TOPICS","Topics","topics":
+		TopicsCommand(client)	
+	case "CLOSECHANNEL","CloseChannel","closechannel":
+		valid := CheckInputLength(data,1)
+		if !valid{
+			return false
+		}
+		RemoveTopicCommand(client,data)		
 	default:
 		logger.ErrorLog(input[0]+" command not found")
 		fmt.Println("Command Not Found,Check the man page")
@@ -260,4 +285,31 @@ func PublishCommand(client *utils.NewClient,input []string) any {
 	}
 	pubsub.Broker(client,input[0],input[1])
 	return ""
+}
+
+func UnsubscribeCommand(client *utils.NewClient, input []string) string{
+
+	if input[0] == "" {
+		return "Requires the topic name"
+	}
+
+	pubsub.HandleUnsubscribes(client,input[0])
+
+	return ""
+}
+
+
+func TopicsCommand(client *utils.NewClient){
+	
+	pubsub.GetTopics(client)
+
+}
+
+
+func RemoveTopicCommand(client *utils.NewClient, input []string){
+	if input[0] == "" {
+		client.Conn.Write([]byte("Topic name required\n"))
+		return 
+	}
+	pubsub.CloseChannel(client,input[0])
 }

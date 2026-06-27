@@ -1,6 +1,8 @@
 package pubsub
 
 import (
+	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -9,7 +11,7 @@ import (
 
 // Single Channel and will contain many to many relationship with Subs and Pubs
 type SubrChannel struct {
-	Subscribers      []*utils.NewClient
+	Subscribers []*utils.NewClient
 	Publisher []*utils.NewClient
 	Topic             string
 	SubscribeChan chan string
@@ -143,5 +145,74 @@ func Broker(client *utils.NewClient,topic string , msg string) {
 	}
 	
 
+
+}
+
+
+func HandleUnsubscribes(client *utils.NewClient, topic string)  {
+	Helper.Mu.Lock()
+	defer Helper.Mu.Unlock()
+
+	channel , exist := FindChannel(&Helper,topic)
+
+	if !exist && channel == nil {
+		client.Conn.Write([]byte("Channel on the topic does not exist yet\n"))
+		return
+	}
+
+	for idx , sub := range channel.Subscribers {
+		if sub == client {
+			channel.Subscribers = slices.Delete(channel.Subscribers,idx,idx+1)	
+			break
+		}
+	}					
+
+	for idx , pub := range channel.Publisher {
+		if pub == client {
+			channel.Publisher = slices.Delete(channel.Publisher,idx,idx+1)	
+			break
+		}
+	}
+
+	client.Conn.Write([]byte("Sucessfully Unsubscribed to "+topic+".\n"))
+}
+
+
+func GetTopics(client *utils.NewClient){
+	Helper.Mu.Lock()
+	topics := make([]string,len(Helper.ChannelNames))
+	copy(topics,Helper.ChannelNames)
+	Helper.Mu.Unlock()
+
+	for idx, topic := range topics {
+		client.Conn.Write([]byte(strconv.Itoa(idx)+". "+topic+"\n"))
+	}
+}
+
+func CloseChannel(client *utils.NewClient,topic string){
+	Helper.Mu.Lock()
+	topics := make([]string,len(Helper.ChannelNames))
+	copy(topics,Helper.ChannelNames)
+
+	for idx, channel := range topics {
+		if channel == topic {
+			Helper.ChannelNames = slices.Delete(Helper.ChannelNames,idx,idx+1)
+
+			break
+		}
+	}
+
+	topicsChannel := make([]*SubrChannel,len(Helper.Channels))
+	copy(topicsChannel,Helper.Channels)
+
+	for idx, channel := range topicsChannel {
+		if channel.Topic == topic {
+			Helper.Channels = slices.Delete(Helper.Channels,idx,idx+1)
+			break
+		}
+	}
+	Helper.Mu.Unlock()	
+
+	GetTopics(client)
 
 }

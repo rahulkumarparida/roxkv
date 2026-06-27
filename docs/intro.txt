@@ -1,86 +1,181 @@
-# RoxKV - Lightweight Key Value Store
+# RoxKV - Lightweight Networked Key-Value Database
 
 Hello there! 👋
 
-Welcome to RoxKV, a lightweight key-value database written in Go by Rahul Kumar Parida.
+Welcome to **RoxKV**, a lightweight networked key-value database written entirely in Go by **Rahul Kumar Parida**.
 
-RoxKV started as a learning project to understand how databases, storage engines, parsers, persistence layers, background workers, and concurrency work under the hood. Over time it has evolved into a small but capable key-value store with support for persistence, expiration, logging, and custom command parsing.
+RoxKV began as a personal challenge to understand how systems like Redis work internally—not by reading about them, but by building one from scratch.
+
+What started as a simple in-memory map has gradually evolved into a small database server featuring persistence, TTL expiration, custom command parsing, background workers, TCP networking, concurrent client handling, and a Publish/Subscribe messaging system.
+
+The goal of this project is not to replace Redis, but to explore the engineering behind storage engines, networking, concurrency, synchronization, and distributed system concepts one feature at a time.
+
+---
 
 ## Current Features
 
-• Store key-value pairs in memory
+### Storage Engine
 
-• Optional TTL (Time To Live) support
+* In-memory key-value storage
+* Thread-safe operations using `sync.RWMutex`
+* Shared storage across multiple TCP clients
 
-```
-  set token abc123 --ttl 30 min
-```
+### Persistence
 
-• Automatic expiry worker that removes expired keys
+* Daily snapshot-based persistence
+* Restore snapshots from oldest to newest
+* Latest values automatically overwrite stale data
 
-• Persistent storage using daily snapshot files
+### Time To Live (TTL)
 
-• Load snapshots from oldest to newest, ensuring the latest values overwrite older ones
+* Optional key expiration
 
-• Command history and logging system
-
-• Filter logs using:
-
-```
-  history
-  history --success
-  history --error
+```text
+set token abc123 --ttl 30 min
 ```
 
-• Custom parser supporting:
+* Background expiry worker
+* Automatic cleanup of expired keys
 
+### Networking
+
+* Raw TCP server
+* Multi-client support
+* Concurrent request handling
+* Connection inactivity worker
+* Configurable maximum client limit
+
+Connect using:
+
+```text
+nc localhost 6969
 ```
-  "double quotes"
-  'single quotes'
-  `backticks`
+
+### Publish / Subscribe
+
+* Subscribe to topics
+* Publish messages
+* Unsubscribe from topics
+* List active topics
+* Close topics
+
+Example:
+
+```text
+Subscribe game
+
+Publish game GTA6
+
+Unsubscribe game
+
+Topics
+
+CloseChannel game
 ```
 
-• Thread-safe storage using read-write mutexes
+### Logging & History
 
-## What's Next?
+View complete history:
 
-Planned features include:
+```text
+history
+```
 
-• TCP server support
-• Multi-client access
-• Message broker / queue system
-• Additional persistence improvements
-• Better tooling and developer experience
+Filter logs:
+
+```text
+history --success
+
+history --error
+
+history --info
+```
+
+### Custom Command Parser
+
+Supports quoted and unquoted values.
+
+```text
+set name Rahul
+
+set game "Battlefield 4"
+
+set quote 'Never Stop Learning'
+
+set desc `Testing Build`
+```
+
+The parser was implemented manually and preserves spaces inside quoted strings.
+
+---
 
 ## Documentation
 
-To view the complete command reference:
+View the complete manual:
 
-```
-  roxkv man
+```text
+roxkv man
 ```
 
 or
 
+```text
+man roxkv
 ```
-  man roxkv
-```
 
-## Support the Author
+---
 
-If RoxKV helped you learn something, inspired a project, or was simply fun to use, feel free to let me know.
+## Roadmap
 
-Instagram:
-https://www.instagram.com/rahulroxx460
+The next milestones include:
 
-X (Twitter):
-https://x.com/rahulkuparida
+* RESP (Redis Serialization Protocol)
+* Redis CLI compatibility
+* Publisher authorization
+* Improved persistence engine
+* Periodic automatic snapshots
+* Graceful shutdown
+* Benchmark suite
+* Unit & integration tests
 
-GitHub:
+---
+
+## Why RoxKV?
+
+RoxKV exists to answer questions like:
+
+* How does Redis communicate over TCP?
+* How are storage engines designed?
+* How does a parser understand commands?
+* How do goroutines coordinate safely?
+* How are TTL workers implemented?
+* How does Pub/Sub messaging actually work?
+* How do multiple clients share the same in-memory database?
+
+Every feature is implemented with the goal of understanding **why** it works, not just making it work.
+
+---
+
+## Support the Project
+
+If RoxKV helped you learn something, inspired a project, or saved you a few hours of debugging, consider supporting the project.
+
+GitHub
+
 https://github.com/rahulkumarparida
 
-Every message, issue, star, or contribution helps keep the project moving forward.
+Instagram
 
-Built with Go, curiosity, and a lot of debugging.
+https://www.instagram.com/rahulroxx460
 
-* Rahul Kumar Parida
+X (Twitter)
+
+https://x.com/rahulkuparida
+
+Every star, issue, pull request, or message helps the project grow.
+
+---
+
+**Built with Go, curiosity, and far more debugging sessions than expected.**
+
+— Rahul Kumar Parida

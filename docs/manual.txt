@@ -1,181 +1,310 @@
 ROXKV(1)                         User Commands                         ROXKV(1)
 
 NAME
-       roxkv - lightweight in-memory key-value database with persistence,
-       TTL support, logging, and history tracking.
+roxkv - lightweight networked in-memory key-value database with
+persistence, TTL support, Pub/Sub messaging, and history logging.
 
 SYNOPSIS
-       set <key> <value...>
-       set <key> <value...> --ttl <number> <sec|min|hr>
+set <key> <value...>
+set <key> <value...> --ttl <number> <sec|min|hr>
 
-       get <key>
+```
+   get <key>
 
-       del <key>
+   del <key>
 
-       save
+   save
 
-       load
+   load
 
-       keys
+   keys
 
-       history
-       history --success
-       history --error
-       history --info
+   history
+   history --success
+   history --error
+   history --info
+
+   Subscribe <topic>
+
+   Publish <topic> <message>
+
+   Unsubscribe <topic>
+
+   Topics
+
+   CloseChannel <topic>
+```
 
 DESCRIPTION
-       RoxKV is a simple key-value database written in Go. Data is stored
-       in memory for fast access and can be persisted to disk using the
-       SAVE command. RoxKV also supports automatic key expiration through
-       TTL values and maintains an operation history log.
+RoxKV is a lightweight networked key-value database written in Go.
+It was built from scratch as an educational project to explore the
+internal design of systems like Redis.
+
+```
+   Data is stored entirely in memory for fast access and may be
+   persisted to disk using snapshot files. RoxKV also provides
+   automatic key expiration, structured logging, a background expiry
+   worker, and a TCP server allowing multiple concurrent clients to
+   interact with the same shared database.
+
+   In addition to key-value storage, RoxKV implements a lightweight
+   Publish/Subscribe messaging system for real-time communication
+   between connected clients.
+```
 
 COMMANDS
 
-       set <key> <value...>
-              Creates a new key or updates an existing key with the
-              provided value.
+```
+   set <key> <value...>
+          Creates a new key or updates an existing key.
 
-              Values may contain multiple words and can be enclosed in
-              single quotes (' '), double quotes (" "), or backticks (` `)
-              to preserve spaces.
+          Values may span multiple words and may be enclosed in
+          single quotes (' '), double quotes (" "), or backticks (` `)
+          to preserve spaces.
 
-              Examples:
-                  set username rahul
-                  set game "Battlefield 4"
-                  set quote 'Never stop learning'
-
-
-       set <key> <value...> --ttl <number> <sec|min|hr>
-              Stores a key with an expiration time.
-
-              After the specified duration expires, the key is
-              automatically removed by the background expiry worker.
-
-              Supported time units:
-                  sec     Seconds
-                  min     Minutes
-                  hr      Hours
-
-              Examples:
-                  set otp 1234 --ttl 30 sec
-                  set session abc123 --ttl 10 min
-                  set token xyz --ttl 1 hr
+          Examples:
+              set username rahul
+              set game "Battlefield 4"
+              set quote 'Never Stop Learning'
 
 
-       get <key>
-              Retrieves the value associated with the specified key.
+   set <key> <value...> --ttl <number> <sec|min|hr>
+          Stores a key with an expiration timestamp.
 
-              If the key does not exist, RoxKV returns nil. If the key
-              has expired, it is removed automatically and an expiration
-              message is displayed.
+          After the specified duration expires, the background worker
+          automatically removes the key from memory.
 
-              Examples:
-                  get username
-                  get game
+          Supported units:
 
+              sec     Seconds
+              min     Minutes
+              hr      Hours
 
-       del <key>
-              Deletes a key from memory.
+          Examples:
 
-              If the key exists, it is removed immediately. If the key
-              does not exist, an informational message is logged.
-
-              Examples:
-                  del username
-                  del otp
+              set otp 1234 --ttl 30 sec
+              set session abc123 --ttl 10 min
+              set cache data --ttl 2 hr
 
 
-       save
-              Persists all currently loaded keys to disk.
+   get <key>
+          Retrieves the value associated with the supplied key.
 
-              RoxKV writes the in-memory snapshot to a date-based storage
-              file. Existing data from previous snapshots is preserved.
+          If the key does not exist, nil is returned. If the key has
+          already expired, it is deleted immediately before returning.
 
-              Examples:
-                  save
+          Examples:
 
-
-       load
-              Loads previously saved keys from disk into memory.
-
-              During loading, RoxKV processes stored data from older
-              snapshots to newer snapshots, ensuring that the latest
-              version of a key is restored.
-
-              Examples:
-                  load
+              get username
+              get game
 
 
-       keys
-              Lists all currently available keys stored in memory.
+   del <key>
+          Removes a key from the database.
 
-              Useful for inspecting the active dataset and verifying
-              successful loads or inserts.
+          If the key is not present, an informational message is
+          written to the history log.
 
-              Examples:
-                  keys
+          Examples:
 
-
-       history
-              Displays all logged operations.
-
-              The history log includes successful operations, informational
-              messages, and error messages generated during database
-              execution.
-
-              Examples:
-                  history
+              del username
+              del otp
 
 
-       history --success
-              Displays only successful operations.
+   save
+          Writes the current in-memory dataset to disk.
 
-              Useful for auditing key creation, updates, persistence
-              events, and database loading activities.
+          RoxKV stores snapshots using date-based files while
+          preserving previously saved data.
 
-              Examples:
-                  history --success
+          Examples:
 
-
-       history --error
-              Displays only error entries.
-
-              Useful for debugging parser issues, invalid command usage,
-              failed persistence operations, and other runtime problems.
-
-              Examples:
-                  history --error
+              save
 
 
-       history --info
-              Displays only informational entries.
+   load
+          Restores previously saved snapshots into memory.
 
-              Useful for all the operations performed by users.
+          Snapshots are processed from oldest to newest so that newer
+          values automatically replace older versions of the same key.
 
-              Examples:
-                  history --info
+          Examples:
 
+              load
+
+
+   keys
+          Lists every key currently stored in memory.
+
+          Useful for verifying inserts, deletions and successful
+          snapshot loading.
+
+          Examples:
+
+              keys
+
+
+   history
+          Displays every recorded log entry.
+
+          Includes successful operations, informational events and
+          runtime errors.
+
+          Examples:
+
+              history
+
+
+   history --success
+          Displays only successful operations.
+
+          Examples:
+
+              history --success
+
+
+   history --error
+          Displays only error entries.
+
+          Useful when debugging command parsing, persistence or server
+          related failures.
+
+          Examples:
+
+              history --error
+
+
+   history --info
+          Displays informational log entries.
+
+          Includes events such as key deletion, loading, expiration
+          and other runtime notifications.
+
+          Examples:
+
+              history --info
+
+
+   Subscribe <topic>
+          Creates a topic if it does not already exist and subscribes
+          the current TCP client to it.
+
+          Messages published to the topic are immediately delivered to
+          every connected subscriber.
+
+          Examples:
+
+              Subscribe game
+              Subscribe notifications
+
+
+   Publish <topic> <message>
+          Broadcasts a message to every client subscribed to the
+          specified topic.
+
+          Only authorized publishers for a topic may publish
+          messages.
+
+          Examples:
+
+              Publish game GTA6
+              Publish chat "Hello Everyone"
+
+
+   Unsubscribe <topic>
+          Removes the current client from a subscribed topic.
+
+          After unsubscribing, future publications to that topic are
+          no longer delivered to the client.
+
+          Examples:
+
+              Unsubscribe game
+
+
+   Topics
+          Lists every active Pub/Sub topic currently managed by the
+          server.
+
+          Examples:
+
+              Topics
+
+
+   CloseChannel <topic>
+          Permanently removes a topic and disconnects every publisher
+          and subscriber associated with it.
+
+          Examples:
+
+              CloseChannel game
+```
 
 FILES
-       ~/.roxkv/roxdb/
-              Contains persisted database snapshots.
 
-       ~/.roxkv/roxlogs/
-              Contains RoxKV log files organized by date.
+```
+   ~/.roxkv/roxdb/
+          Contains persisted snapshot files.
+
+   ~/.roxkv/roxlogs/
+          Contains daily log files.
+
+   ~/.roxkv/docs/
+          Contains bundled documentation and manual pages.
+```
 
 BACKGROUND SERVICES
-       Expiry Worker
-              A background worker runs periodically and scans stored keys
-              for expiration timestamps.
 
-              Expired keys are automatically removed without requiring
-              manual intervention.
+```
+   Expiry Worker
+          Periodically scans every stored key for expired TTL values
+          and removes expired entries automatically.
 
+   Connection Worker
+          Monitors connected TCP clients and automatically disconnects
+          inactive connections after the configured timeout period.
+```
+
+NETWORKING
+
+```
+   RoxKV exposes a raw TCP server.
+
+          Default Address:
+
+              localhost:6969
+
+          Connect using:
+
+              nc localhost 6969
+```
 
 AUTHOR
-       Rahul Kumar Parida
+
+```
+   Rahul Kumar Parida
+```
 
 VERSION
-       RoxKV v1.0
+
+```
+   RoxKV v1.0
+```
+
+FUTURE WORK
+
+```
+   RESP protocol support
+
+   Redis CLI compatibility
+
+   Publisher authorization
+
+   Improved persistence engine
+
+   Graceful shutdown
+
+   Periodic automatic snapshots
+```
 
 ROXKV(1)                         User Commands                         ROXKV(1)
