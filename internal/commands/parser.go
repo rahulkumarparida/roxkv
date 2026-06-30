@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"time"
 
@@ -32,7 +31,7 @@ func ParseCommands(store *store.MemoryAlloc,input []string , client *utils.NewCl
 		fmt.Println(val)
 		return  val
 	case "SET","set","Set":
-		 val:= SetCommand(store,data)
+		 val:= SetCommand(client,store,data)
 		 if val {
 			fmt.Println("Added the KeyValue")
 			return  val
@@ -103,46 +102,52 @@ func ParseCommands(store *store.MemoryAlloc,input []string , client *utils.NewCl
 
 } 
 
-func ParseInput(data []string) []string{
-	var dataAppended []string
-	re := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+func ParseInput(data []string) []string {
+	var result []string
+	var current []rune
 
-	var startWord bool = false
-	var tempWord string
-	for _, v := range data {
-		
-		if len(v) == 0 {
-			continue
-		}
+	var inQuote bool
+	var quoteChar rune
 
-		if !startWord && (v[0] == '\'' || v[0] == '"' || v[0] == '`' ) {
-				startWord = true
-				tempWord += v
-				continue
-		}
-		if startWord || v[len(v)-1] == '\'' || v[len(v)-1] ==  '"' || v[len(v)-1] == '`'  {
-				tempWord +=" " + v
-				if v[len(v)-1] == '\'' || v[len(v)-1] ==  '"' || v[len(v)-1] == '`'  {
-					dataAppended = append(dataAppended, tempWord)
-					startWord = false	
-					tempWord = ""
+	for _, token := range data {
+		for _, ch := range token {
+
+			switch {
+			case !inQuote && (ch == '"' || ch == '\'' || ch == '`'):
+				inQuote = true
+				quoteChar = ch
+
+			case inQuote && ch == quoteChar:
+				inQuote = false
+
+			case !inQuote && ch == ' ':
+				if len(current) > 0 {
+					result = append(result, string(current))
+					current = current[:0]
 				}
-				
-				continue
+
+			default:
+				current = append(current, ch)
+			}
 		}
 
-		if !startWord && re.MatchString(v) {
-				dataAppended = append(dataAppended, v)
-				
+		if inQuote {
+			current = append(current, ' ')
+		} else if len(current) > 0 {
+			result = append(result, string(current))
+			current = current[:0]
 		}
 	}
 
-	return dataAppended
+	if len(current) > 0 {
+		result = append(result, string(current))
+	}
 
+	return result
 }
 
 
-func SetCommand(stre *store.MemoryAlloc ,data []string) bool{
+func SetCommand(client *utils.NewClient,stre *store.MemoryAlloc ,data []string) bool{
 	var dataItems store.Item
 	var inpData []string
 	var stripTtl []string
@@ -154,30 +159,42 @@ func SetCommand(stre *store.MemoryAlloc ,data []string) bool{
 		
 	}
 
+
+
 	if slices.Contains(data,"--ttl") {
 		sliceFrom := slices.Index(data,"--ttl")
 		stripTtl = data[sliceFrom+1:]
 		if len(stripTtl) > 2 {
 			logger.ErrorLog("2 Args after the --ttl flag")
-			fmt.Println("Only 2 args after --ttl")
+			fmt.Println("2 args after --ttl")
 			return false
 		}
+		value :=  ParseInput(data[1:sliceFrom-1])
+		sizeOfValue := len(value)
 		dataItems = store.Item{
 			Key: data[0],
-			Val: ParseInput(data[1:sliceFrom]),
+			Val:value,
 			Ttl: time.Now(),
+			UpdatedAt: time.Now(),
+			LastAcessedBy: client,
+			Size: sizeOfValue,
 		}
 
 	}else{
 		inpData = data[1:]
 		stripTtl = []string{"",""} 
+		value :=  ParseInput(inpData)
+		sizeOfValue := len(value)
+
 		dataItems = store.Item{
 			Key: data[0],
-			Val: ParseInput(inpData),
+			Val: value,
 			Ttl: time.Time{},
+			UpdatedAt: time.Now(),
+			LastAcessedBy: client,
+			Size: sizeOfValue,
 		}
 	}
-	
 	
 
 	store.SetKv(stre , &dataItems , stripTtl)
@@ -228,7 +245,9 @@ func SaveCommand(stre *store.MemoryAlloc) string{
 
 		
 	}
-	val := persistence.StoreToJson(allData)
+	dbpath := utils.DbFolder()
+	filename := time.Now().Format("2006-01-02")+".json"
+	val := persistence.StoreToJson(dbpath,filename,allData)
 	fmt.Println("Saving: ", val)
 	logmsg:= "All keys avaliable in RAM till are saved to DB"
 	logger.SucessLog(logmsg)
@@ -236,9 +255,10 @@ func SaveCommand(stre *store.MemoryAlloc) string{
 }
 
 func LoaderCommand(stre *store.MemoryAlloc) int{
+	dbpath := utils.DbFolder()
 	logmsg:= "All keys avaliable in DB are loaded to RAM"
 	logger.SucessLog(logmsg)
-	count := persistence.LoadJsons(stre)
+	count := persistence.LoadJsons(dbpath,stre)
 	return count
 }
 

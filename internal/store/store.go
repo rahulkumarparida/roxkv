@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,8 +14,13 @@ import (
 // The structure of the value to be stored
 type Item struct {
 	Key string
-	Val any
+	Val any // should be converted to []byte only
 	Ttl time.Time
+	UpdatedAt time.Time
+	CreatedAt time.Time
+	LastAcessedBy *utils.NewClient
+	KeyAccessCount int
+	Size  int
 }
 
 // This one struturizes on how the data wil be stored and allocated
@@ -31,10 +37,8 @@ func (ma *MemoryAlloc) Set(kv Item) {
 	ma.Mu.Lock()
 	defer ma.Mu.Unlock()
 	
-	ma.Data[kv.Key] = Item{
-		kv.Key,
-		kv.Val,
-		kv.Ttl}
+	ma.Data[kv.Key] = kv
+
 	logger.SucessLog(kv.Key + " added to the memory")
 
 }
@@ -48,6 +52,7 @@ func (ma *MemoryAlloc) Get(key string) (Item,bool){
 	data , exist := ma.Data[key]
 
 	if !exist {
+		fmt.Println("Key dows not exsist")
 		logger.InfoLog("Key does not exists")
 		return Item{} ,false
 	}
@@ -139,12 +144,43 @@ func SetKv(store *MemoryAlloc,kv *Item, stripTtl []string) bool{
 
 		 futureTime = evaluatetime(timetoAdd,duration)
 	}
+	data ,exist := store.Get(kv.Key)
 
+	var values Item
+	if exist {
+		// store.Mu.Lock()
+		values = Item{
+			data.Key,
+			kv.Val,
+			futureTime,
+			time.Now(),
+			data.CreatedAt,
+			kv.LastAcessedBy,
+			data.KeyAccessCount+1,
+			kv.Size,
+		}
+		// store.Mu.Unlock()
+		return true
+	}else{
+		values = Item{
+			kv.Key,
+			kv.Val,
+			futureTime,
+			time.Now(),
+			time.Now(),
+			kv.LastAcessedBy,
+			1,
+			kv.Size,
+		}
 
-	values := Item{kv.Key,kv.Val,futureTime}
+		
+	}
 
 	store.Set(values)
 	return  true
+
+
+
 }
 
 // Retieves the similar value from the memory and sends it back
@@ -156,11 +192,6 @@ func GetKv(store *MemoryAlloc, key string) Item{
 		return data
 	}
 
-
-	// if !data.Ttl.IsZero() && data.Ttl.Before(time.Now()) {
-	// 	DelKv(store, data.Key)
-	// 	return Item{"Exxpired","Key has exprired",time.Now()}
-	// }
 
 	return data
 }

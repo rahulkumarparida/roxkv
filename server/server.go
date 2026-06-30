@@ -8,6 +8,7 @@ import (
 	"net"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/commands"
@@ -21,6 +22,7 @@ const MaxConnections = 5
 
 
 var TotalConnecntions []*utils.NewClient
+
 
 func DeleteClientListing(target *utils.NewClient) {
 
@@ -40,10 +42,15 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 	client.Conn.Write([]byte(msg))
 
 	for {
+		
 		input, err := reader.ReadString('\n')
 		print(input)
+
 		go DeadOrAliveConnections(ctx, client)
 		go worker.ExpiryWorker(ctx, store)
+		client.Interactions += 1
+		
+
 
 		if err != nil {
 			if err == io.EOF {
@@ -79,7 +86,7 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 }
 
 func ClearConnections(t time.Time, client *utils.NewClient) {
-	if time.Since(client.LastUsed) > (2*time.Minute) {
+	if time.Since(client.LastUsed) > (10*time.Minute) {
 		fmt.Println("Client died: ", client.ID)
 		client.Conn.Write([]byte("Client was Inactive for too long \n"))
 		client.Conn.Close()
@@ -107,7 +114,8 @@ func DeadOrAliveConnections(ctx context.Context, client *utils.NewClient) {
 
 func Server() {
 	store := store.StoreInMemory()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	listner, err := net.Listen("tcp", ":6969")
 
 	if err != nil {
@@ -116,8 +124,12 @@ func Server() {
 		return
 	}
 	defer listner.Close()
+	mutex :=  sync.RWMutex{}
+	go worker.SnapshotWorker(ctx,store,&mutex, TotalConnecntions)
 	fmt.Println("Listening at localhost:6969")
 	for {
+		
+
 
 		conn, err := listner.Accept()
 

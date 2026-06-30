@@ -7,14 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-func CreateFile(data []store.Item, absoluteFilePath string)  bool{
+func CreateFile(data any, absoluteFilePath string)  bool{
 	
 
 	datafile , err:= os.Create(absoluteFilePath)
@@ -23,7 +22,7 @@ func CreateFile(data []store.Item, absoluteFilePath string)  bool{
 	}
 	
 	defer datafile.Close()	
-	
+	fmt.Println("DataCreations: ", data)
 	databytes, err := json.MarshalIndent(data, "", "  ")
 	if utils.HandleError("Error while Marshaling file: ", err){
 		return false
@@ -39,7 +38,7 @@ func CreateFile(data []store.Item, absoluteFilePath string)  bool{
 }
 
 //Func to retireve the current dates data
-func retreiveData(fileName string , data []store.Item) []store.Item{
+func retreiveData(fileName string , data any) any{
 
 	_, err := os.Stat(fileName)
 
@@ -60,7 +59,8 @@ func retreiveData(fileName string , data []store.Item) []store.Item{
 
 		func ()  {
 			
-			seen := make(map[string]bool)
+			if data , ok := data.([]store.Item); ok {
+				seen := make(map[string]bool)
 	
 			for _, val := range data {
 				seen[val.Key] = true
@@ -72,8 +72,7 @@ func retreiveData(fileName string , data []store.Item) []store.Item{
 					seen[val.Key] = true 
 				}
 			}
-
-
+			}
 		}()
 
 
@@ -87,8 +86,7 @@ func retreiveData(fileName string , data []store.Item) []store.Item{
 
 }
 
-func StoreToJson(data []store.Item) bool{
-	dbFolder := utils.DbFolder()
+func StoreToJson(dbFolder string,filename string,data any) bool{
 	if len(dbFolder) == 0 {	
 		return false
 	}
@@ -99,18 +97,22 @@ func StoreToJson(data []store.Item) bool{
 		return  false
 	}
 
-	filename := time.Now().Format("2006-01-02")+".json"
 	KeyfolderName := filepath.Join(dbFolder,filename)
-
-	allData := retreiveData(KeyfolderName,data)
-			
-	val := CreateFile(allData,KeyfolderName)
-
-	if !val {
-		fmt.Println("File not created")
-		return	false
-	}
 	
+
+	var allData any
+
+	if stdata , ok := data.([]store.Item); ok {
+		
+		allData = retreiveData(KeyfolderName,stdata)	
+
+	}else{
+		allData = data
+	}
+	fmt.Println("DataRecieved: ", allData)
+	val := CreateFile(allData,KeyfolderName)		
+
+
 	return val
 	
 }
@@ -142,9 +144,9 @@ func sortFile(allfiles []os.DirEntry) []os.DirEntry{
 }
 
 
-
-func LoadJsons(ms *store.MemoryAlloc) int{
-	dbFolder := utils.DbFolder()
+// loads to the memory not needeee when retrieveing snapshots
+func LoadJsons(dbFolder string,ms *store.MemoryAlloc) int{
+	
 	count := 1
 	if len(dbFolder) == 0 {	
 		fmt.Println("Home directory not found")
@@ -154,7 +156,7 @@ func LoadJsons(ms *store.MemoryAlloc) int{
 	// Retieves all file form the path stores in an slice
 	allFiles , err := os.ReadDir(dbFolder)
 	
-	if utils.HandleError("Error while reading the files", err) {
+	if utils.HandleError("Error while reading the files:", err) {
 		return count
 	}
 

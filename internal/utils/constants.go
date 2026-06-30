@@ -14,6 +14,7 @@ type NewClient struct {
 	LastUsed    time.Time
 	ConnectedAt time.Time
 	Mu          sync.RWMutex
+	Interactions int
 }
 
 
@@ -25,8 +26,11 @@ func CreateClient(conn net.Conn) *NewClient {
 		LastUsed:    time.Now(),
 		ConnectedAt: time.Now(),
 		Mu:          sync.RWMutex{},
+		Interactions: 1,
 	}
 }
+
+
 
 
 
@@ -48,4 +52,22 @@ func LogFolder() string{
 		return ""
 	}
 	return logFolder
+}
+
+func SnapshotFolder() string{
+	HomePath , err := os.UserHomeDir()
+	snapFolder := filepath.Join(HomePath , ".roxkv" , "roxsnaps") 
+	if HandleError("Error while fetching Home directory ", err) {
+		return ""
+	}
+	return snapFolder	
+}
+
+func MetricFolder() string{
+	HomePath , err := os.UserHomeDir()
+	metricFolder := filepath.Join(HomePath , ".roxkv" , "roxmetrics") 
+	if HandleError("Error while fetching Home directory ", err) {
+		return ""
+	}
+	return metricFolder
 }

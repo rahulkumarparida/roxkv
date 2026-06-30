@@ -1,0 +1,13 @@
+GetMemoryUsage()
+
+GetTotalKeys()
+
+GetExpiredKeys()
+
+GetCommandCount()
+
+GetConnectedClients()
+
+GetTopicCount()
+
+GetUptime()

@@ -1,0 +1,2 @@
+To build workers that keep analysing and keeping snapshots of the metric after a particular interval time
+also build functions such that it can be accessed by time frame e.g. lasst 5 mins last 10 mins etc 

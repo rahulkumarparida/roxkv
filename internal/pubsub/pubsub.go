@@ -17,7 +17,10 @@ type SubrChannel struct {
 	SubscribeChan chan string
 	Wg sync.WaitGroup
 	Mu sync.RWMutex
-	
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	LastPublisher *utils.NewClient
+	PublishCount int
 }
 
 
@@ -42,6 +45,10 @@ func CreateTopic(client *utils.NewClient,topic string) *SubrChannel{
 		SubscribeChan: make(chan string,100),
 		Wg: sync.WaitGroup{},
 		Mu: sync.RWMutex{},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		LastPublisher: nil,
+		PublishCount: 1,
 	}
 
 
@@ -70,6 +77,7 @@ func GetChannel(client *utils.NewClient,topic string) *SubrChannel{
 	channel, exist := FindChannel(&Helper,topic)
 
 	if exist {
+		
 		return channel
 	}
 	
@@ -85,6 +93,7 @@ func HandleSubscribers(client *utils.NewClient,topic string) bool{
 	channel := GetChannel(client,topic)
 
 	channel.Mu.Lock()
+	channel.UpdatedAt = time.Now()
 	channel.Subscribers = append(channel.Subscribers, client)
 	channel.Mu.Unlock()
 
@@ -102,26 +111,27 @@ func DeliverMessage(sub *utils.NewClient, msg string,wg *sync.WaitGroup){
 }
 
 func Broker(client *utils.NewClient,topic string , msg string) {
-
-	
 	Helper.Mu.Lock()
+	defer Helper.Mu.Unlock()
+
 	channel , exist := FindChannel(&Helper,topic)
-	Helper.Mu.Unlock()
 
 	if !exist && channel == nil {
 		client.Conn.Write([]byte("Channel on the topic does not exist yet\n"))
 		return
 	}
 
+	channel.UpdatedAt = time.Now()
+	channel.LastPublisher = client
+	channel.PublishCount += 1
 	
 
 
-	Helper.Mu.Lock()
 	subs := make([]*utils.NewClient, len(channel.Subscribers))
 	pubs := make([]*utils.NewClient,len(channel.Publisher))
 	copy(subs,channel.Subscribers)
 	copy(pubs,channel.Publisher)
-	Helper.Mu.Unlock()
+
 	var IsPublisher bool = false
 	for _, pub := range pubs {
 		if client == pub{
@@ -145,7 +155,6 @@ func Broker(client *utils.NewClient,topic string , msg string) {
 	}
 	
 
-
 }
 
 
@@ -160,6 +169,7 @@ func HandleUnsubscribes(client *utils.NewClient, topic string)  {
 		return
 	}
 
+	channel.UpdatedAt = time.Now()
 	for idx , sub := range channel.Subscribers {
 		if sub == client {
 			channel.Subscribers = slices.Delete(channel.Subscribers,idx,idx+1)	
