@@ -21,12 +21,9 @@ import (
 const MaxConnections = 5
 
 
-var TotalConnecntions []*utils.NewClient
-
-
 func DeleteClientListing(target *utils.NewClient) {
 
-	TotalConnecntions = slices.DeleteFunc(TotalConnecntions, func(n *utils.NewClient) bool {
+	utils.TotalConnecntions = slices.DeleteFunc(utils.TotalConnecntions, func(n *utils.NewClient) bool {
 
 		return n.ID == target.ID
 
@@ -38,8 +35,9 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 	reader := bufio.NewReader(client.Conn)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	msg := fmt.Sprintln("Total Users Connected: ", len(TotalConnecntions))
+	msg := fmt.Sprintln("Total Users Connected: ", len(utils.TotalConnecntions))
 	client.Conn.Write([]byte(msg))
+	mutex := sync.Mutex{}
 
 	for {
 		
@@ -48,7 +46,10 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 
 		go DeadOrAliveConnections(ctx, client)
 		go worker.ExpiryWorker(ctx, store)
+		mutex.Lock()
 		client.Interactions += 1
+		utils.TotalInputs += 1
+		mutex.Unlock()
 		
 
 
@@ -109,8 +110,9 @@ func DeadOrAliveConnections(ctx context.Context, client *utils.NewClient) {
 
 		}
 	}
-
 }
+
+
 
 func Server() {
 	store := store.StoreInMemory()
@@ -124,8 +126,9 @@ func Server() {
 		return
 	}
 	defer listner.Close()
+	utils.ServerStarted = time.Now()
 	mutex :=  sync.RWMutex{}
-	go worker.SnapshotWorker(ctx,store,&mutex, TotalConnecntions)
+	go worker.SnapshotWorker(ctx,store,&mutex, utils.TotalConnecntions)
 	fmt.Println("Listening at localhost:6969")
 	for {
 		
@@ -141,13 +144,13 @@ func Server() {
 
 		client := *utils.CreateClient(conn)
 
-		if len(TotalConnecntions) > MaxConnections {
+		if len(utils.TotalConnecntions) > MaxConnections {
 			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
 			client.Conn.Close()
 			continue
 		}
 
-		TotalConnecntions = append(TotalConnecntions, &client)
+		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 		fmt.Println("Connected: ", client.ID)
 		go handleConnection(&client, store)
 

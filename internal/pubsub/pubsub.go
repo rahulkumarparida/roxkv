@@ -188,7 +188,7 @@ func HandleUnsubscribes(client *utils.NewClient, topic string)  {
 }
 
 
-func GetTopics(client *utils.NewClient){
+func GetTopics(client *utils.NewClient) []string{
 	Helper.Mu.Lock()
 	topics := make([]string,len(Helper.ChannelNames))
 	copy(topics,Helper.ChannelNames)
@@ -197,6 +197,7 @@ func GetTopics(client *utils.NewClient){
 	for idx, topic := range topics {
 		client.Conn.Write([]byte(strconv.Itoa(idx)+". "+topic+"\n"))
 	}
+	return topics
 }
 
 func CloseChannel(client *utils.NewClient,topic string){

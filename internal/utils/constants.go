@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+// DB use
+var TotalInputs int = 0
+
+// Server Client
+var ServerStarted time.Time
+var TotalConnecntions []*NewClient
+
 type NewClient struct {
 	ID          any
 	Conn        net.Conn
@@ -16,6 +23,15 @@ type NewClient struct {
 	Mu          sync.RWMutex
 	Interactions int
 }
+
+type ClientMetaData struct{
+	Id string
+	LastUsed time.Time
+	ConnectedAt time.Time
+	Interactions int
+}
+
+
 
 
 func CreateClient(conn net.Conn) *NewClient {
@@ -31,9 +47,21 @@ func CreateClient(conn net.Conn) *NewClient {
 }
 
 
+// Metrics
+type MonitorComputeStat struct{
+	Username string
+	Os string
+	Architecture string
+	Cpus int
+	TotalRam uint64
+	FreeRam uint64
+	UsedRamPercent float64
+	TotalGoRoutines int
+}
 
 
 
+//  Constant Folders section
 func DbFolder()  string{
 	HomePath , err := os.UserHomeDir()
 	dbFolder := filepath.Join(HomePath , ".roxkv" , "roxdb") 
