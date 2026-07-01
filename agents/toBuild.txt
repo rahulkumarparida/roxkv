@@ -1,0 +1,55 @@
+
+
+                    Master Agent
+                         │
+      ┌──────────────────┼──────────────────┐
+      │                  │                  │
+ Storage Agent     Performance Agent   Security Agent
+      │                  │                  │
+      └──────────────┬──────────────────────┘
+                     │
+              Final Response
+
+
+
+
+Storage Agent
+GetKey()
+GetKeys()
+GetLargestKeys()
+GetExpiredKeys()
+GetNamespaces()
+GetSnapshots()
+GetKeyMetadata()
+
+
+Performance Agent
+GetServerStats()
+GetMemoryUsage()
+GetCommandStats()
+GetSlowCommands()
+GetHotKeys()
+GetTelemetry()
+
+
+Security Agent
+GetClients()
+GetFailedCommands()
+GetLogs()
+GetAuditLogs()
+GetConnectionStats()
+
+
+PubSub Agent
+GetTopics()
+GetSubscribers()
+GetPublishStats()
+GetInactiveTopics()
+
+
+Maintainenence Agent
+DeleteExpiredKeys()
+Compact()
+SaveSnapshot()
+LoadSnapshot()
+CloseTopic()

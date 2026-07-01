@@ -9,7 +9,7 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-func GetUptime() time.Duration {
+func GetServerUptime() time.Duration {
 	// time.start at a begning call
 	// to the time asked query
 	duration := time.Since(utils.ServerStarted)

@@ -130,6 +130,7 @@ func Server() {
 	mutex :=  sync.RWMutex{}
 	go worker.SnapshotWorker(ctx,store,&mutex, utils.TotalConnecntions)
 	fmt.Println("Listening at localhost:6969")
+	
 	for {
 		
 
@@ -144,6 +145,8 @@ func Server() {
 
 		client := *utils.CreateClient(conn)
 
+		
+		
 		if len(utils.TotalConnecntions) > MaxConnections {
 			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
 			client.Conn.Close()
@@ -153,6 +156,7 @@ func Server() {
 		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 		fmt.Println("Connected: ", client.ID)
 		go handleConnection(&client, store)
+		ChatServer(store,&client)			
 
 	}
 
