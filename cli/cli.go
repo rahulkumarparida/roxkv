@@ -16,7 +16,7 @@ func CLIUI(){
 	
 	defer cancel()
 
-	store := store.StoreInMemory()
+	store,namespace := store.StoreInMemory()
 
 	for{
 		worker.ExpiryWorker(ctx,store)
@@ -43,7 +43,7 @@ func CLIUI(){
 			break
 		}
 
-		commands.ParseCommands(store,comandArgs,nil)
+		commands.ParseCommands(store,namespace,comandArgs,nil)
 
 
 	}

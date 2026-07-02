@@ -2,7 +2,6 @@ package store
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -11,16 +10,42 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
+
+
+
+// TTl metrics
+type TTLInfo struct{
+	Key string
+	ExpiresIn time.Duration
+}
+
+type TTLMetrics struct {
+    ActiveTTLKeys      int
+    PermanentKeys      int
+    TotalExpiredKeys   uint64
+    ExpiresToday       uint64
+    NextExpiringKeys   []TTLInfo
+	Mu sync.RWMutex
+}
+
+var TTLMetricsContainer *TTLMetrics = &TTLMetrics{
+    NextExpiringKeys: make([]TTLInfo, 0), // Initialize slices too!
+}
 // The structure of the value to be stored
+type Metadata struct {
+    TTL time.Time
+    UpdatedAt time.Time	
+    CreatedAt time.Time
+    LastAcessedBy *utils.NewClient
+    KeyAccessCount int64
+    Size int64
+    Namespace string
+}
+
 type Item struct {
 	Key string
 	Val any // should be converted to []byte only
-	Ttl time.Time
-	UpdatedAt time.Time
-	CreatedAt time.Time
-	LastAcessedBy *utils.NewClient
-	KeyAccessCount int
-	Size  int
+	Meta Metadata
 }
 
 // This one struturizes on how the data wil be stored and allocated
@@ -28,8 +53,6 @@ type MemoryAlloc struct{
 	Mu sync.RWMutex
 	Data map[string]Item
 }
-
-
 
 // This refrencfes to memory alloc any one can use it by refrencing to MemoryAlloc
 func (ma *MemoryAlloc) Set(kv Item) {
@@ -90,7 +113,7 @@ func (ma *MemoryAlloc) Keys() []string{
 	}
 
 	for k , d := range data{
-		if !d.Ttl.IsZero() && d.Ttl.Before(time.Now()) {
+		if !d.Meta.TTL.IsZero() && d.Meta.TTL.Before(time.Now()) {
 			DelKv(ma, d.Key)
 			continue
 		}
@@ -101,82 +124,110 @@ func (ma *MemoryAlloc) Keys() []string{
 }
 
 // This one initializes the making of data returns a memory address ot type MemoryAlloc we can access all the methods belonging to MemoryAlloc
-func StoreInMemory() (*MemoryAlloc){
+func StoreInMemory() (*MemoryAlloc,*NameSpace){
 
 	store := &MemoryAlloc{
 		Data: make(map[string]Item),
 	}
-
-	return store
-}
-
-func evaluatetime(ttl int,dur string) time.Time{
-	
-	
-	switch strings.ToLower(dur) {
-		case "second","sec":
-			return time.Now().Add(time.Duration(ttl) * time.Second)
-		case "minutes","min":
-			return time.Now().Add(time.Duration(ttl) * time.Minute)
-		case "hour","hh":
-			return time.Now().Add(time.Duration(ttl) * time.Hour)
-		default:
-			return time.Now()
+	ns := &NameSpace{
+		Data: make(map[string]int),
 	}
+
+	return store,ns
 }
+
+// Name space 
+type NameSpace struct{
+	Mu sync.RWMutex
+	Data map[string]int
+}
+
+func (ns *NameSpace) SetNameSpace(name string){
+	ns.Mu.Lock()
+	defer ns.Mu.Unlock()
+
+	if ns.Data == nil {
+		ns.Data = make(map[string]int)
+	}
+
+	ns.Data[name] += 1
+
+
+}
+
+func (ns *NameSpace) GetNamespace(name string)(string,int){
+	if ns.Data == nil {
+		ns.Data = make(map[string]int)
+	}
+
+	return name , ns.Data[name]
+}
+
+
+
+
 
 // Uses the function from MemoryAlloc and kv Item struct to Set a variable
-func SetKv(store *MemoryAlloc,kv *Item, stripTtl []string) bool{	
-	var futureTime time.Time 
-	if !kv.Ttl.IsZero() {
-		if stripTtl[0] == "" || stripTtl[1] == "" {
-			logger.ErrorLog("--ttl arguments not provided please check the man page for arguments")
-			return  false
-		}
-			var timetoAdd , err = strconv.Atoi(stripTtl[0]) // time like 12 ,13 ,14
+func SetKv(store *MemoryAlloc,namespace *NameSpace,kv *Item) bool{	
 
-		if utils.HandleError("Error while parsing time provided", err){
-			logger.ErrorLog("Parsing failed while parsing the time. Integre required")
-			return false
-		}
-
-		var duration = stripTtl[1] // duration like sec , min, hr
-
-		 futureTime = evaluatetime(timetoAdd,duration)
-	}
+	
 	data ,exist := store.Get(kv.Key)
 
 	var values Item
+	var ns string
+	
 	if exist {
-		// store.Mu.Lock()
+
+		if strings.Contains(data.Key,":") {
+			part := strings.Split(data.Key,":")
+			ns = part[0]
+		}else{
+			ns = data.Key
+		}
+		
+
+		meta := Metadata{
+			kv.Meta.TTL,
+			time.Now(),
+			data.Meta.CreatedAt,
+			kv.Meta.LastAcessedBy,
+			data.Meta.KeyAccessCount+1,
+			kv.Meta.Size,
+			ns,
+		}
+
 		values = Item{
 			data.Key,
 			kv.Val,
-			futureTime,
-			time.Now(),
-			data.CreatedAt,
-			kv.LastAcessedBy,
-			data.KeyAccessCount+1,
-			kv.Size,
+			meta,
 		}
-		// store.Mu.Unlock()
-		return true
+
 	}else{
-		values = Item{
-			kv.Key,
-			kv.Val,
-			futureTime,
-			time.Now(),
-			time.Now(),
-			kv.LastAcessedBy,
-			1,
-			kv.Size,
+		if strings.Contains(kv.Key,":") {
+			part := strings.Split(kv.Key,":")
+			ns = part[0]
+		}else{
+			ns = kv.Key
 		}
+		
+		// meta := Metadata{
+		// 	kv.Meta.TTL,
+		// 	time.Now(),
+		// 	time.Now(),
+		// 	kv.Meta.LastAcessedBy,
+		// 	1,
+		// 	kv.Meta.Size,
+		// 	ns,
+		// }
+
+
+		values = *kv
 
 		
 	}
-
+	
 	store.Set(values)
+	namespace.SetNameSpace(kv.Key)
 	return  true
 
 
@@ -215,4 +266,3 @@ func KeyKv(store *MemoryAlloc) []string{
 
 	return data
 }
-

@@ -21,7 +21,7 @@ func GetComputerUsageTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_computer_usage",
-			Description: "Returns overall computer information including username, operating system, CPU count, RAM usage, architecture, and number of running Go routines.",
+			Description: "Returns overall computer information including username, operating system, CPU count, RAM usage, architecture, and number of running Go routines.And provide any recommendations depending on the machine informations.",
 			Parameters:  toolParams,
 		},
 	}

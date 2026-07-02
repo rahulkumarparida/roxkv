@@ -3,6 +3,8 @@ package commands
 import (
 	"fmt"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/logger"
@@ -16,7 +18,7 @@ func CheckInputLength(input []string, paramsrequired int)bool{
 	return len(input) == paramsrequired
 }
 
-func ParseCommands(store *store.MemoryAlloc,input []string , client *utils.NewClient) any{
+func ParseCommands(store *store.MemoryAlloc,namespace *store.NameSpace,input []string , client *utils.NewClient) any{
 	
 
 	if len(input)  == 0{
@@ -31,7 +33,7 @@ func ParseCommands(store *store.MemoryAlloc,input []string , client *utils.NewCl
 		fmt.Println(val)
 		return  val
 	case "SET","set","Set":
-		 val:= SetCommand(client,store,data)
+		 val:= SetCommand(client,store,namespace,data)
 		 if val {
 			fmt.Println("Added the KeyValue")
 			return  val
@@ -57,7 +59,7 @@ func ParseCommands(store *store.MemoryAlloc,input []string , client *utils.NewCl
 		fmt.Println(datamsg)
 		return  datamsg
 	case "LOAD","Load","load":
-		count := LoaderCommand(store)
+		count := LoaderCommand(store,namespace)
 		fmt.Println("Restored: ", count , " Keys")
 		return  count
 	case "HISTORY","History","history":
@@ -147,7 +149,23 @@ func ParseInput(data []string) []string {
 }
 
 
-func SetCommand(client *utils.NewClient,stre *store.MemoryAlloc ,data []string) bool{
+
+func evaluatetime(ttl int,dur string) time.Time{
+	
+	
+	switch strings.ToLower(dur) {
+		case "second","sec":
+			return time.Now().Add(time.Duration(ttl) * time.Second)
+		case "minutes","min":
+			return time.Now().Add(time.Duration(ttl) * time.Minute)
+		case "hour","hh":
+			return time.Now().Add(time.Duration(ttl) * time.Hour)
+		default:
+			return time.Now()
+	}
+}
+
+func SetCommand(client *utils.NewClient,stre *store.MemoryAlloc,namespace *store.NameSpace ,data []string) bool{
 	var dataItems store.Item
 	var inpData []string
 	var stripTtl []string
@@ -164,40 +182,70 @@ func SetCommand(client *utils.NewClient,stre *store.MemoryAlloc ,data []string) 
 	if slices.Contains(data,"--ttl") {
 		sliceFrom := slices.Index(data,"--ttl")
 		stripTtl = data[sliceFrom+1:]
-		if len(stripTtl) > 2 {
+		if len(stripTtl) > 2 || stripTtl[0] == "" || stripTtl[1] == ""  {
 			logger.ErrorLog("2 Args after the --ttl flag")
 			fmt.Println("2 args after --ttl")
 			return false
 		}
 		value :=  ParseInput(data[1:sliceFrom-1])
 		sizeOfValue := len(value)
+		var timetoAdd , err = strconv.Atoi(stripTtl[0]) // time like 12 ,13 ,14
+
+		if utils.HandleError("Error while parsing time provided", err){
+			logger.ErrorLog("Parsing failed while parsing the time. Integre required")
+			return false
+		}
+		futuretime := evaluatetime(timetoAdd,stripTtl[1])
+
+
+		meta := store.Metadata{
+			TTL: futuretime,
+			UpdatedAt: time.Now(),
+			LastAcessedBy: client,
+			Size: int64(sizeOfValue),
+
+		}
+
 		dataItems = store.Item{
 			Key: data[0],
 			Val:value,
-			Ttl: time.Now(),
-			UpdatedAt: time.Now(),
-			LastAcessedBy: client,
-			Size: sizeOfValue,
+			Meta: meta,
 		}
+
+		if time.Until(futuretime) < time.Duration(time.Until(time.Now().Add(24*time.Hour))) {
+			store.TTLMetricsContainer.ExpiresToday += 1
+		}
+
+		store.TTLMetricsContainer.ActiveTTLKeys += 1
+		store.TTLMetricsContainer.NextExpiringKeys = append(store.TTLMetricsContainer.NextExpiringKeys, store.TTLInfo{
+			Key:data[0],
+			ExpiresIn:time.Until(futuretime),
+		})
 
 	}else{
 		inpData = data[1:]
 		stripTtl = []string{"",""} 
 		value :=  ParseInput(inpData)
 		sizeOfValue := len(value)
+		store.TTLMetricsContainer.PermanentKeys += 1
+		meta := store.Metadata{
+			TTL: time.Time{},
+			UpdatedAt: time.Now(),
+			LastAcessedBy: client,
+			Size: int64(sizeOfValue),
+		}
+
 
 		dataItems = store.Item{
 			Key: data[0],
 			Val: value,
-			Ttl: time.Time{},
-			UpdatedAt: time.Now(),
-			LastAcessedBy: client,
-			Size: sizeOfValue,
+			Meta: meta,
 		}
 	}
 	
-
-	store.SetKv(stre , &dataItems , stripTtl)
+	
+	
+	store.SetKv(stre,namespace , &dataItems)
 	
 	return true
 }
@@ -239,7 +287,7 @@ func SaveCommand(stre *store.MemoryAlloc) string{
 	for _, key := range keys {
 		
 		rawdata := store.GetKv(stre,key)
-		if rawdata.Ttl.IsZero() {
+		if rawdata.Meta.TTL.IsZero() {
 			allData = append(allData, rawdata)	
 		}
 
@@ -254,11 +302,11 @@ func SaveCommand(stre *store.MemoryAlloc) string{
 	return "Saved"
 }
 
-func LoaderCommand(stre *store.MemoryAlloc) int{
+func LoaderCommand(stre *store.MemoryAlloc,namespace *store.NameSpace) int{
 	dbpath := utils.DbFolder()
 	logmsg:= "All keys avaliable in DB are loaded to RAM"
 	logger.SucessLog(logmsg)
-	count := persistence.LoadJsons(dbpath,stre)
+	count := persistence.LoadJsons(dbpath,stre,namespace)
 	return count
 }
 

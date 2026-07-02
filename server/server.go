@@ -31,7 +31,7 @@ func DeleteClientListing(target *utils.NewClient) {
 
 }
 
-func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
+func handleConnection(client *utils.NewClient, store *store.MemoryAlloc, namespace *store.NameSpace) {
 	reader := bufio.NewReader(client.Conn)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -66,7 +66,7 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 		}
 
 		// Gets the data from type interface{}/any to string and then writes to byte
-		data := commands.ParseCommands(store, strings.Fields(input),client)
+		data := commands.ParseCommands(store,namespace,strings.Fields(input),client)
 		datastr := fmt.Sprintf("%v", data)
 		_, werr := client.Conn.Write([]byte("roxkv> " + datastr + " \n"))
 		client.Mu.Lock()
@@ -115,7 +115,7 @@ func DeadOrAliveConnections(ctx context.Context, client *utils.NewClient) {
 
 
 func Server() {
-	store := store.StoreInMemory()
+	store , namespace := store.StoreInMemory()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	listner, err := net.Listen("tcp", ":6969")
@@ -130,7 +130,7 @@ func Server() {
 	mutex :=  sync.RWMutex{}
 	go worker.SnapshotWorker(ctx,store,&mutex, utils.TotalConnecntions)
 	fmt.Println("Listening at localhost:6969")
-	go ChatServer(store)			
+	go ChatServer(store,namespace)			
 	
 	for {
 		
@@ -156,7 +156,7 @@ func Server() {
 
 		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 		fmt.Println("Connected: ", client.ID)
-		go handleConnection(&client, store)
+		go handleConnection(&client, store,namespace)
 
 	}
 

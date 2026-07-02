@@ -9,14 +9,14 @@ import (
 	"sync"
 
 	"github.com/ollama/ollama/api"
-	"github.com/rahulkumarparida/roxkv/agents/MonitorAgent"
+	storageagent "github.com/rahulkumarparida/roxkv/agents/StorageAgent"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
 
-func handleChatConnection(user *utils.NewClient,stre *store.MemoryAlloc,agent *api.Client){
+func handleChatConnection(user *utils.NewClient,stre *store.MemoryAlloc,namespace *store.NameSpace,agent *api.Client){
 
 	reader := bufio.NewReader(user.Conn)
 
@@ -48,8 +48,9 @@ func handleChatConnection(user *utils.NewClient,stre *store.MemoryAlloc,agent *a
 		}
 
 		// Gets the data from type interface{}/any to string and then writes to byte
-		// kvagent.KvAgent(input,stre,user,agent)
-		monitoragent.MonitorAgent(input,stre,user,agent)
+		// kvagent.KvAgent(input,stre,user,namespace,agent)
+		// monitoragent.MonitorAgent(input,stre,user,agent)
+		storageagent.StorageAgent(input,stre,namespace,user,agent)
 		
 		
 
@@ -58,7 +59,7 @@ func handleChatConnection(user *utils.NewClient,stre *store.MemoryAlloc,agent *a
 }
 
 
-func ChatServer(stre *store.MemoryAlloc){
+func ChatServer(stre *store.MemoryAlloc,namespace *store.NameSpace){
 	agent,err := api.ClientFromEnvironment()
 
 	if err != nil {
@@ -96,7 +97,7 @@ func ChatServer(stre *store.MemoryAlloc){
 
 		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 		fmt.Println("Connected: ", client.ID)
-		go handleChatConnection(&client, stre, agent)
+		go handleChatConnection(&client, stre,namespace, agent)
 
 	}
 

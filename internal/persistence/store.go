@@ -145,7 +145,7 @@ func sortFile(allfiles []os.DirEntry) []os.DirEntry{
 
 
 // loads to the memory not needeee when retrieveing snapshots
-func LoadJsons(dbFolder string,ms *store.MemoryAlloc) int{
+func LoadJsons(dbFolder string,ms *store.MemoryAlloc,namespace *store.NameSpace) int{
 	
 	count := 1
 	if len(dbFolder) == 0 {	
@@ -188,7 +188,7 @@ func LoadJsons(dbFolder string,ms *store.MemoryAlloc) int{
 
 
 	for _, val := range dataArr {
-		store.SetKv(ms , &val , []string{"",""})
+		store.SetKv(ms ,namespace, &val)
 		fmt.Println("Val Set: ", val.Key)
 	}
 

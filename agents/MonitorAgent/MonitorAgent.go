@@ -145,7 +145,7 @@ func MonitorAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, 
 		}
 
 		if finalResponse != "" {
-			user.Conn.Write([]byte("roxai> " + finalResponse + "\n"))
+			user.Conn.Write([]byte("\nroxai> " + finalResponse + "\n"))
 		}
 
 		return

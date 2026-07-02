@@ -70,26 +70,26 @@ func GetCommad(input string) (string, string) {
 	return strings.ToLower(strings.TrimSpace(cmd)), strings.TrimSpace(input)
 }
 
-func flagExtractor(data string){
+// func flagExtractor(data string){
 	
-}
+// }
 
 
-var singleArgCommandRegistry = map[string]func(store *store.MemoryAlloc,client *utils.NewClient) any{
+var singleArgCommandRegistry = map[string]func(store *store.MemoryAlloc,namespace *store.NameSpace,client *utils.NewClient) any{
 
-		"keys":func(store *store.MemoryAlloc, client *utils.NewClient) any{
+		"keys":func(store *store.MemoryAlloc,namespace *store.NameSpace, client *utils.NewClient) any{
 			keys := commands.KeysCommand(store)
 			return keys
 		},
-		"save":func(store *store.MemoryAlloc, client *utils.NewClient) any{
+		"save":func(store *store.MemoryAlloc,namespace *store.NameSpace, client *utils.NewClient) any{
 			keys := commands.SaveCommand(store)
 			return keys
 		},
-		"load":func(store *store.MemoryAlloc, client *utils.NewClient) any{
-			keys := commands.LoaderCommand(store)
+		"load":func(store *store.MemoryAlloc,namespace *store.NameSpace, client *utils.NewClient) any{
+			keys := commands.LoaderCommand(store,namespace)
 			return keys
 		},
-		"topics":func(store *store.MemoryAlloc, client *utils.NewClient) any{
+		"topics":func(store *store.MemoryAlloc,namespace *store.NameSpace, client *utils.NewClient) any{
 			commands.TopicsCommand(client)
 			return nil
 		},
@@ -176,7 +176,7 @@ var multiValueArgCommandRegistry = map[string]func(store *store.MemoryAlloc,clie
 
 }
 
-func Parser(store *store.MemoryAlloc,input []string , client *utils.NewClient) any{
+func Parser(store *store.MemoryAlloc,namespace *store.NameSpace,input []string , client *utils.NewClient) any{
 
 	
 
@@ -201,7 +201,7 @@ func Parser(store *store.MemoryAlloc,input []string , client *utils.NewClient) a
 		// topics
 		fmt.Println("cmd:", cmd)
 		if fn,exists := singleArgCommandRegistry[cmd]; exists {
-				data := fn(store,client)
+				data := fn(store,namespace,client)
 				return data
 		}
 	
