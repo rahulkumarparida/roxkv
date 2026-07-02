@@ -1,10 +1,11 @@
-package child
+package kvagent
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,30 +21,38 @@ func KvAgent(query string,stre *store.MemoryAlloc,user *utils.NewClient,client *
 	ctx := context.Background()
 	stream := false
 
-	message := []api.Message{
-		{
-			Role: "user",
-			Content: query,
-		},
-	}
-
-
+		Message := []api.Message{
+			{
+				Role: "system",
+				Content: `You are an AI controller for an in-memory key-value database.
+		Use tools whenever database access is required.
+		Never fabricate database contents unless required.
+		Answer normally if no tool is needed.`,
+			},
+			{
+				Role: "user",
+				Content: query,
+			},
+		}
+	// User will send a query
 	req := &api.ChatRequest{
 		Model: "llama3.2:3b",
-		Messages: message,
+		Messages: Message,
 		Tools: []api.Tool{GetKeyTool(),SetKeyTool(),KeysTool(),DeleteKeyTool(),SaveTool(),LoadTool()},
 		Stream: &stream,
+		Options: KvInference,
 	}
 
 	var toolCallsToExecute []api.ToolCall
 	var assistantTextResponse string
 
+	// LLM asks for tool execution
 	cerr := client.Chat(ctx,req,func(resp api.ChatResponse) error{
 			if len(resp.Message.ToolCalls) > 0 {
 			toolCallsToExecute = resp.Message.ToolCalls
 			}
 			if resp.Message.Content != "" {
-			assistantTextResponse += resp.Message.Content
+			assistantTextResponse = resp.Message.Content
 			}
 			return nil
 		})
@@ -54,14 +63,17 @@ func KvAgent(query string,stre *store.MemoryAlloc,user *utils.NewClient,client *
 		}
 
 		if len(toolCallsToExecute) > 0 {
-			
+			// Executes the tools
 			fmt.Printf("Model requested %d tool call(s).\n", len(toolCallsToExecute))
-			message = append(message , api.Message{
+			Message = append(Message , api.Message{
 				Role:      "assistant",
 				ToolCalls: toolCallsToExecute,
 			})
+			
 
 			for _, tool := range toolCallsToExecute {
+
+
 				argsByte, _ := json.Marshal(tool.Function.Arguments)
 
 
@@ -77,11 +89,12 @@ func KvAgent(query string,stre *store.MemoryAlloc,user *utils.NewClient,client *
 						fmt.Printf("Executed get tool for: %s -> %v\n", args.Key, result)
 						values := fmt.Sprintf("%v", result.Val)
 						// Append tool result message
-						message = append(message, api.Message{
+						Message = append(Message, api.Message{
 							Role:    "tool",
 							Content: values,
 						})
-						user.Conn.Write([]byte("roxai> "+values+"\n"))	
+
+
 						
 					case "set":
 						var args struct {
@@ -104,7 +117,12 @@ func KvAgent(query string,stre *store.MemoryAlloc,user *utils.NewClient,client *
 						result := store.SetKv(stre,&item,[]string{"",""})
 
 						values := fmt.Sprintf("%v", result)
-						user.Conn.Write([]byte("roxai> "+values+"\n"))
+
+						Message = append(Message, api.Message{
+							Role:    "tool",
+							Content: values,
+						})
+
 
 					case "del":
 						var args struct {
@@ -116,40 +134,78 @@ func KvAgent(query string,stre *store.MemoryAlloc,user *utils.NewClient,client *
 
 						values := fmt.Sprintf("%v", result)
 
-						user.Conn.Write([]byte("roxai> "+values+"\n"))
+						Message = append(Message, api.Message{
+							Role:    "tool",
+							Content: values,
+						})
+
 
 					case "keys":
 						result := store.KeyKv(stre)
 						values := fmt.Sprintf("%v", result)
 
-						user.Conn.Write([]byte("roxai> "+values+"\n"))
+						Message = append(Message, api.Message{
+							Role:    "tool",
+							Content: values,
+						})
+
 					case "save":
 						values := commands.SaveCommand(stre)
-						user.Conn.Write([]byte("roxai> "+values+"\n"))
+						Message = append(Message, api.Message{
+							Role:    "tool",
+							Content: values,
+						})
 					case "load":
 						total :=commands.LoaderCommand(stre)
-						user.Conn.Write([]byte("roxai> "+ string(rune(total)) +"\n"))
+
+						Message = append(Message, api.Message{
+							Role:    "tool",
+							Content: strconv.Itoa(total),
+						})
 					default:
-						user.Conn.Write([]byte("roxai> "+"No tool found for the operration\n"))
-						return 
-						
+						Message = append(Message, api.Message{
+							Role:    "tool",
+							Content: "No Tools found",
+						})
+
 				}
 				
 			}
-				
+			// Finnaly asks for a message response for the given query ans tools executed
+			var finalResponse string
+
+			secondReq := &api.ChatRequest{
+				Model: "llama3.2:3b",
+				Messages: Message,
+				Stream: &stream,
+				Options: KvInference,
+			}
+
+			secondErr := client.Chat(ctx, secondReq, func(resp api.ChatResponse) error {
+				fmt.Printf("Executes after sending the final response %+v\n", Message)
+				fmt.Printf("%+v\n", req.Messages)
+				if resp.Message.Content != "" {
+					finalResponse = resp.Message.Content
+				}
+				return nil
+			})
+
+			if secondErr != nil {
+				log.Fatalf("Second Ollama API call failed: %v", secondErr)
+			}
+
+			// 2. Print the model's final conversational answer to the user
+			if finalResponse != "" {
+				user.Conn.Write([]byte("roxai> " + finalResponse + "\n"))
+			}
 			
-		}
-	
-		if assistantTextResponse != "" {
+			return
+
+		}else if assistantTextResponse != "" {
 		// fmt.Fprintf(user.Conn, "%s\n", assistantTextResponse)
 			user.Conn.Write([]byte("\nroxai> "+assistantTextResponse+"\n"))
 			return
 		}
-	
-
-
-  
-
 }
 
 

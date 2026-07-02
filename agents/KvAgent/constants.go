@@ -1,6 +1,15 @@
-package child
+package kvagent
 
 import "github.com/ollama/ollama/api"
+
+
+var KvInference = map[string]any{
+    "num_predict": 200,   // Limit output to a maximum of 100 tokens
+    "num_ctx":     1048,  // Set total context window (input + output) to 2048 tokens
+    "temperature": 0.4,   // Lower temperature makes responses more focused and deterministic
+    "top_p":       0.9,   // Top-p sampling boundary
+}
+
 
 func GetKeyTool() api.Tool{
 

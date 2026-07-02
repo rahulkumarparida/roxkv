@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/pubsub"
-	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
@@ -17,7 +16,7 @@ func GetServerUptime() time.Duration {
 	return duration
 }
 
-func GetConnectedClients() []utils.ClientMetaData{
+func GetConnectedClients() []utils.ClientMetaData {
 	// Total clients Connected and Metadata from the server
 	var clientsConnected []utils.ClientMetaData
 	mu := sync.Mutex{}
@@ -27,9 +26,9 @@ func GetConnectedClients() []utils.ClientMetaData{
 	mu.Unlock()
 	for _, client := range connections {
 		client := utils.ClientMetaData{
-			Id:	client.ID.(string),
-			LastUsed: client.LastUsed,
-			ConnectedAt: client.ConnectedAt,
+			Id:           client.ID.(string),
+			LastUsed:     client.LastUsed,
+			ConnectedAt:  client.ConnectedAt,
 			Interactions: client.Interactions,
 		}
 		clientsConnected = append(clientsConnected, client)
@@ -38,16 +37,7 @@ func GetConnectedClients() []utils.ClientMetaData{
 	return clientsConnected
 }
 
-func GetTotalKeys(store *store.MemoryAlloc) []string{
-	// All the keys keyskv
-	store.Mu.Lock()
-	keys := store.Keys()
-	store.Mu.Unlock()	
-	
-	return keys
-}
-
-func GetCommandCount() int{
+func GetCommandCount() int {
 	// write a counter that is publicaly avaliable strcut with mutexes
 	mu := sync.Mutex{}
 	mu.Lock()
@@ -56,11 +46,12 @@ func GetCommandCount() int{
 	return input
 }
 
-func GetTopicCount(client *utils.NewClient) (int,[]string){
+// Pubsub stuff
+func GetTopicCount(client *utils.NewClient) (int, []string) {
 	// len(topics)
 	mu := sync.Mutex{}
 	mu.Lock()
 	topics := pubsub.GetTopics(client)
 	mu.Unlock()
-	return len(topics),topics
+	return len(topics), topics
 }

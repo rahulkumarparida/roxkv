@@ -12,13 +12,11 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 )
 
-
-
-func GetComputerUsage() utils.MonitorComputeStat{
-    // runtime package
+func GetComputerUsage() utils.MonitorComputeStat {
+	// runtime package
 
 	//user information
-	u,err := user.Current()
+	u, err := user.Current()
 	if utils.HandleError("Error while fetching user data", err) {
 		return utils.MonitorComputeStat{}
 	}
@@ -34,7 +32,7 @@ func GetComputerUsage() utils.MonitorComputeStat{
 
 	runtime.ReadMemStats(&m)
 
-	virtualmem,err := mem.VirtualMemory()
+	virtualmem, err := mem.VirtualMemory()
 	totalram := virtualmem.Total
 	freeram := virtualmem.Free
 	usedpercentage := virtualmem.UsedPercent
@@ -42,81 +40,78 @@ func GetComputerUsage() utils.MonitorComputeStat{
 	totalgoroutines := runtime.NumGoroutine()
 
 	computeusage := utils.MonitorComputeStat{
-		Username: username,
-		Os: os,
-		Architecture: architechture,
-		Cpus: cpus,
-		TotalRam: totalram,
-		FreeRam: freeram,
-		UsedRamPercent: usedpercentage,
+		Username:        username,
+		Os:              os,
+		Architecture:    architechture,
+		Cpus:            cpus,
+		TotalRam:        totalram,
+		FreeRam:         freeram,
+		UsedRamPercent:  usedpercentage,
 		TotalGoRoutines: totalgoroutines,
 	}
 	return computeusage
 
 }
 
-
-func GetCPUUsage() string{
+func GetCPUUsage() string {
 	mu := sync.Mutex{}
 	mu.Lock()
-	percentage , err:= cpu.Percent(0,false)
+	percentage, err := cpu.Percent(0, false)
 	mu.Unlock()
-	 if utils.HandleError("Error while fetching user data", err) {
+	if utils.HandleError("Error while fetching user data", err) {
 		return ""
-	 }
+	}
 
-	return strconv.FormatFloat(percentage[0],'f', -1, 641)
+	return strconv.FormatFloat(percentage[0], 'f', -1, 64)
 }
 
-type RAM struct{
-	TotalRam string
-	FreeRam string
-	UsedPercentge string 
+type RAM struct {
+	TotalRam      uint64
+	FreeRam       uint64
+	UsedPercentge float64
 }
 
-func GetRAMUsage() RAM{
+func GetRAMUsage() RAM {
 	var m runtime.MemStats
 
 	runtime.ReadMemStats(&m)
 
-	virtualmem,err := mem.VirtualMemory()
+	virtualmem, err := mem.VirtualMemory()
 	if utils.HandleError("Error while fetching user data", err) {
 		return RAM{}
 	}
 
-	totalram := strconv.FormatUint(virtualmem.Total,10)
-	freeram := strconv.FormatUint(virtualmem.Free,10)
-	usedpercentage := strconv.FormatFloat(virtualmem.UsedPercent,'f', -1, 641)
+	totalram := virtualmem.Total
+	freeram := virtualmem.Free
+	usedpercentage := virtualmem.UsedPercent
 
-	
 	return RAM{
-		TotalRam: totalram,
-		FreeRam: freeram,
+		TotalRam:      totalram,
+		FreeRam:       freeram,
 		UsedPercentge: usedpercentage,
 	}
 
-
 }
 
-type DISK struct{
-	Total string
-	Free string
-	Avaliable string
-	Err error 
+type DISK struct {
+	Total     uint64
+	Free      uint64
+	Avaliable uint64
+	Err       error
 }
 
-func GetDiskUsage(path string) DISK{
+func GetDiskUsage(path string) DISK {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(path, &stat)
 	if err != nil {
-		return DISK{"0", "0", "0", err}
+		return DISK{0, 0, 0, err}
 	}
 
 	const GB = 1024 * 1024 * 1024
 	// Calculate sizes in Gigabytes
-	total := strconv.FormatUint((stat.Blocks * uint64(stat.Bsize))/ GB,10)
-	free := strconv.FormatUint((stat.Bfree * uint64(stat.Bsize))/GB,10)
-	available := strconv.FormatUint((stat.Bavail * uint64(stat.Bsize))/GB,10) 
+	total := (stat.Blocks * uint64(stat.Bsize)) / GB
+	free := (stat.Bfree * uint64(stat.Bsize)) / GB
+	available := (stat.Bavail * uint64(stat.Bsize)) / GB
 
 	return DISK{total, free, available, nil}
 }
@@ -127,12 +122,13 @@ type RuntimeStats struct {
 	Arch             string
 	CPUs             string
 	Goroutines       string
-	AllocatedMemMB   string
-	TotalAllocatedMB string
-	SystemMemMB      string
-	HeapAllocMB      string
-	GCCycles         string
+	AllocatedMemMB   uint64
+	TotalAllocatedMB uint64
+	SystemMemMB      uint64
+	HeapAllocMB      uint64
+	GCCycles         uint32
 }
+
 func GetRuntimeStats() RuntimeStats {
 	// 1. Gather general runtime and CPU metrics
 	goVersion := runtime.Version()
@@ -155,10 +151,10 @@ func GetRuntimeStats() RuntimeStats {
 		Arch:             arch,
 		CPUs:             cpus,
 		Goroutines:       goroutines,
-		AllocatedMemMB:   strconv.FormatUint(ms.Alloc/MB, 10),
-		TotalAllocatedMB: strconv.FormatUint(ms.TotalAlloc/MB, 10),
-		SystemMemMB:      strconv.FormatUint(ms.Sys/MB, 10),
-		HeapAllocMB:      strconv.FormatUint(ms.HeapAlloc/MB, 10),
-		GCCycles:         strconv.FormatUint(uint64(ms.NumGC), 10),
+		AllocatedMemMB:   ms.Alloc / MB,
+		TotalAllocatedMB: ms.TotalAlloc / MB,
+		SystemMemMB:      ms.Sys / MB,
+		HeapAllocMB:      ms.HeapAlloc / MB,
+		GCCycles:         ms.NumGC,
 	}
 }

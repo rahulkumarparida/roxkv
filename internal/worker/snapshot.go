@@ -60,7 +60,7 @@ func TakeSnapShot(ms *store.MemoryAlloc, snaptime time.Time,clientsconnected []*
 }
 
 func SnapshotWorker(ctx context.Context,ms *store.MemoryAlloc,mu *sync.RWMutex,clients []*utils.NewClient){
-	ticker := time.NewTicker(5*time.Minute)
+	ticker := time.NewTicker(10*time.Minute)
 	defer ticker.Stop()
 
 	

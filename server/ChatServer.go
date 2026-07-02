@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/ollama/ollama/api"
-	child "github.com/rahulkumarparida/roxkv/agents/child/KvAgent"
+	"github.com/rahulkumarparida/roxkv/agents/MonitorAgent"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -48,7 +48,9 @@ func handleChatConnection(user *utils.NewClient,stre *store.MemoryAlloc,agent *a
 		}
 
 		// Gets the data from type interface{}/any to string and then writes to byte
-		child.KvAgent(input,stre,user,agent)
+		// kvagent.KvAgent(input,stre,user,agent)
+		monitoragent.MonitorAgent(input,stre,user,agent)
+		
 		
 
 	}
@@ -56,7 +58,7 @@ func handleChatConnection(user *utils.NewClient,stre *store.MemoryAlloc,agent *a
 }
 
 
-func ChatServer(stre *store.MemoryAlloc, user *utils.NewClient){
+func ChatServer(stre *store.MemoryAlloc){
 	agent,err := api.ClientFromEnvironment()
 
 	if err != nil {
