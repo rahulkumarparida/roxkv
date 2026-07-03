@@ -144,7 +144,7 @@ func Server() {
 			continue
 		}
 
-		client := *utils.CreateClient(conn)
+		client := *utils.CreateClient(conn,"client")
 
 		
 		

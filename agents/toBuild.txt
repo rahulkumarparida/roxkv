@@ -40,11 +40,6 @@ GetAuditLogs()
 GetConnectionStats()
 
 
-PubSub Agent
-GetTopics()
-GetSubscribers()
-GetPublishStats()
-GetInactiveTopics()
 
 
 Maintainenence Agent

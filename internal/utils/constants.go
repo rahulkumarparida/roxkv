@@ -15,8 +15,17 @@ var TotalInputs int = 0
 var ServerStarted time.Time
 var TotalConnecntions []*NewClient
 
+type Role string
+
+const (
+	RoleSystem Role = "system"
+	RoleClient Role = "client"
+	RoleAdmin Role = "admin"	
+)
+
 type NewClient struct {
 	ID          any
+	Role		string
 	Conn        net.Conn
 	LastUsed    time.Time
 	ConnectedAt time.Time
@@ -34,10 +43,16 @@ type ClientMetaData struct{
 
 
 
-func CreateClient(conn net.Conn) *NewClient {
+func CreateClient(conn net.Conn,role string) *NewClient {
+
+	if role != string(RoleAdmin) && role != string(RoleClient) && role != string(RoleSystem) {
+		return nil
+	}
+
 
 	return &NewClient{
 		ID:          conn.RemoteAddr().String(),
+		Role: 		 role,
 		Conn:        conn,
 		LastUsed:    time.Now(),
 		ConnectedAt: time.Now(),

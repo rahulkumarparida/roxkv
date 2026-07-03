@@ -87,7 +87,7 @@ func ChatServer(stre *store.MemoryAlloc,namespace *store.NameSpace){
 			continue
 		}
 
-		client := *utils.CreateClient(conn)
+		client := *utils.CreateClient(conn,"system")
 
 		if len(utils.TotalConnecntions) > MaxConnections {
 			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))

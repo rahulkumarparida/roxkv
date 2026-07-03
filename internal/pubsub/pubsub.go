@@ -6,10 +6,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
 // Single Channel and will contain many to many relationship with Subs and Pubs
+type TopicHistory struct{
+	Message string
+	Size int64
+	CreatedAt time.Time
+}
+
+
 type SubrChannel struct {
 	Subscribers []*utils.NewClient
 	Publisher []*utils.NewClient
@@ -21,6 +29,8 @@ type SubrChannel struct {
 	UpdatedAt time.Time
 	LastPublisher *utils.NewClient
 	PublishCount int
+	History []TopicHistory
+	TotalSize int64
 }
 
 
@@ -48,7 +58,9 @@ func CreateTopic(client *utils.NewClient,topic string) *SubrChannel{
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		LastPublisher: nil,
+		History: []TopicHistory{},
 		PublishCount: 1,
+		TotalSize: 0,
 	}
 
 
@@ -121,9 +133,18 @@ func Broker(client *utils.NewClient,topic string , msg string) {
 		return
 	}
 
+	historymsg := TopicHistory{
+		Message: msg,
+		Size: int64(len(msg)),
+		CreatedAt: time.Now(),
+	}
+
+
 	channel.UpdatedAt = time.Now()
 	channel.LastPublisher = client
 	channel.PublishCount += 1
+	channel.TotalSize += int64(len(msg)) 	
+	channel.History = append(channel.History, historymsg)
 	
 
 
@@ -139,7 +160,7 @@ func Broker(client *utils.NewClient,topic string , msg string) {
 		}
 	}
 	
-	if IsPublisher {
+	if IsPublisher || client.Role == string(utils.RoleSystem) || client.Role == string(utils.RoleAdmin) {
 		for _, sub := range subs {
 		
 		channel.Wg.Add(1)
@@ -205,6 +226,8 @@ func CloseChannel(client *utils.NewClient,topic string){
 	topics := make([]string,len(Helper.ChannelNames))
 	copy(topics,Helper.ChannelNames)
 
+	
+
 	for idx, channel := range topics {
 		if channel == topic {
 			Helper.ChannelNames = slices.Delete(Helper.ChannelNames,idx,idx+1)
@@ -226,4 +249,56 @@ func CloseChannel(client *utils.NewClient,topic string){
 
 	GetTopics(client)
 
+}
+
+
+func PublishToAllTopics(client *utils.NewClient, message string) string{
+
+	if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
+		return ""
+	}
+	logger.InfoLog(" "+client.Role+" : Broadcasted a message across all topics")
+	topics := GetTopics(client)
+
+	for _, topic := range topics {
+
+		Broker(client,topic,message)
+		
+	}
+
+	return "Published Sucessfully"
+}
+
+func GetClients(client *utils.NewClient,topic *SubrChannel, category string) []*utils.NewClient{
+
+	var clients []*utils.NewClient
+
+	switch category{
+			case "sub":
+				clients = append(clients, topic.Subscribers...)
+			case "pub":
+				clients = append(clients, topic.Publisher...)
+			default:
+				return clients
+			}
+		return  clients
+}
+
+func GetAllMembers(client *utils.NewClient,subOrPub string) []*utils.NewClient{
+
+	if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
+		return []*utils.NewClient{}
+	}
+	logger.InfoLog(" "+client.Role+" : Broadcasted a message across all topics")
+	
+	Helper.Mu.Lock()
+	topicsChannel := make([]*SubrChannel,len(Helper.Channels))
+	copy(topicsChannel,Helper.Channels)
+	Helper.Mu.Unlock()
+	var clients []*utils.NewClient
+	for _, channel := range topicsChannel {
+		clients = GetClients(client,channel,subOrPub)
+	}
+
+	return  clients
 }
