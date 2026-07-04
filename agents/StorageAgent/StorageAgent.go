@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents"
 	"github.com/rahulkumarparida/roxkv/internal/metrics"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -18,10 +19,10 @@ type toolTopNArgs struct {
 }
 
 type storageClientSummary struct {
-	ID           any       `json:"id"`
-	LastUsed     string    `json:"last_used"`
-	ConnectedAt  string    `json:"connected_at"`
-	Interactions int       `json:"interactions"`
+	ID           any    `json:"id"`
+	LastUsed     string `json:"last_used"`
+	ConnectedAt  string `json:"connected_at"`
+	Interactions int    `json:"interactions"`
 }
 
 type storageKeyMetadataSummary struct {
@@ -54,7 +55,7 @@ After gathering data, summarize the storage health, important patterns, and any 
 	}
 
 	req := &api.ChatRequest{
-		Model: "llama3.2:3b",
+		Model:    agents.AGENT_USED,
 		Messages: messages,
 		Tools: []api.Tool{
 			GetTotalKeysTool(),
@@ -103,79 +104,56 @@ After gathering data, summarize the storage health, important patterns, and any 
 			ToolCalls: toolCallsToExecute,
 		})
 
+		var finalResponse []any
+
 		for _, tool := range toolCallsToExecute {
 			argsByte, _ := json.Marshal(tool.Function.Arguments)
-			var toolResult string
 
 			switch tool.Function.Name {
 			case "get_total_keys":
-				toolResult = marshalStorageResult(metrics.GetTotalKeys(stre, namespace))
+				finalResponse = append(finalResponse, metrics.GetTotalKeys(stre, namespace))
 			case "get_largest_keys":
-				toolResult = marshalStorageResult(metrics.GetLargestKeys(stre, namespace, parseTopN(argsByte)))
+				finalResponse = append(finalResponse, metrics.GetLargestKeys(stre, namespace, parseTopN(argsByte)))
 			case "get_smallest_keys":
-				toolResult = marshalStorageResult(metrics.GetSmallestKeys(stre, namespace, parseTopN(argsByte)))
+				finalResponse = append(finalResponse, metrics.GetSmallestKeys(stre, namespace, parseTopN(argsByte)))
 			case "get_average_value_size":
-				toolResult = marshalStorageResult(metrics.GetAverageValueSize(stre, namespace))
+				finalResponse = append(finalResponse, metrics.GetAverageValueSize(stre, namespace))
 			case "get_namespaces":
-				toolResult = marshalStorageResult(metrics.GetNamespaces(stre, namespace))
+				finalResponse = append(finalResponse, metrics.GetNamespaces(stre, namespace))
 			case "get_ttl_metrics":
-				toolResult = marshalStorageResult(metrics.GetTTLMetrics())
+				finalResponse = append(finalResponse, metrics.GetTTLMetrics())
 			case "get_expired_keys":
-				toolResult = marshalStorageResult(metrics.GetExpiredKeys(stre))
+				finalResponse = append(finalResponse, metrics.GetExpiredKeys(stre))
 			case "get_upcoming_expirations":
-				toolResult = marshalStorageResult(metrics.GetUpcomingExpirations(stre, parseTopN(argsByte)))
+				finalResponse = append(finalResponse, metrics.GetUpcomingExpirations(stre, parseTopN(argsByte)))
 			case "get_keys_without_ttl":
-				toolResult = marshalStorageResult(metrics.GetKeysWithoutTTL(stre))
+				finalResponse = append(finalResponse, metrics.GetKeysWithoutTTL(stre))
 			case "get_snapshot_count":
-				toolResult = marshalStorageResult(metrics.GetSnapshotCount())
+				finalResponse = append(finalResponse, metrics.GetSnapshotCount())
 			case "get_latest_snapshot":
-				toolResult = marshalStorageResult(metrics.GetLatestSnapshot())
+				finalResponse = append(finalResponse, metrics.GetLatestSnapshot())
 			case "get_snapshot_size":
-				toolResult = marshalStorageResult(metrics.GetSnapshotSize())
+				finalResponse = append(finalResponse, metrics.GetSnapshotSize())
 			case "get_persistence_health":
-				toolResult = marshalStorageResult(metrics.GetPersistenceHealth())
+				finalResponse = append(finalResponse, metrics.GetPersistenceHealth())
 			case "get_oldest_key":
-				toolResult = marshalStorageResult(summarizeKeyMetadata(metrics.GetOldestKey(stre)))
+				finalResponse = append(finalResponse, summarizeKeyMetadata(metrics.GetOldestKey(stre)))
 			case "get_newest_key":
-				toolResult = marshalStorageResult(summarizeKeyMetadata(metrics.GetNewestKey(stre)))
+				finalResponse = append(finalResponse, summarizeKeyMetadata(metrics.GetNewestKey(stre)))
 			case "get_most_accessed_key":
-				toolResult = marshalStorageResult(summarizeKeyMetadata(metrics.GetMostAccessedKey(stre)))
+				finalResponse = append(finalResponse, summarizeKeyMetadata(metrics.GetMostAccessedKey(stre)))
 			case "get_least_accessed_key":
-				toolResult = marshalStorageResult(summarizeKeyMetadata(metrics.GetLeastAccessedKey(stre)))
+				finalResponse = append(finalResponse, summarizeKeyMetadata(metrics.GetLeastAccessedKey(stre)))
 			case "get_recently_modified_keys":
-				toolResult = marshalStorageResult(summarizeKeyMetadataSlice(metrics.GetRecentlyModifiedKeys(stre, parseTopN(argsByte))))
+				finalResponse = append(finalResponse, summarizeKeyMetadataSlice(metrics.GetRecentlyModifiedKeys(stre, parseTopN(argsByte))))
 			default:
-				toolResult = "No Tools found"
+				continue
 			}
-
-			messages = append(messages, api.Message{
-				Role:    "tool",
-				Content: toolResult,
-			})
 		}
 
-		var finalResponse string
-
-		secondReq := &api.ChatRequest{
-			Model:    "llama3.2:3b",
-			Messages: messages,
-			Stream:   &stream,
-			Options:  StorageInference,
-		}
-
-		secondErr := client.Chat(ctx, secondReq, func(resp api.ChatResponse) error {
-			if resp.Message.Content != "" {
-				finalResponse = resp.Message.Content
-			}
-			return nil
-		})
-
-		if secondErr != nil {
-			log.Fatalf("Second Ollama API call failed: %v", secondErr)
-		}
-
-		if finalResponse != "" {
-			user.Conn.Write([]byte("\nroxai> " + finalResponse + "\n"))
+		if len(finalResponse) > 0 {
+			value := fmt.Sprintf("%v", finalResponse)
+			user.Conn.Write([]byte("\nroxai> " + value + "\n"))
 		}
 
 		return

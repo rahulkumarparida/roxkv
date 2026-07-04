@@ -154,11 +154,17 @@ func Broker(client *utils.NewClient,topic string , msg string) {
 	copy(pubs,channel.Publisher)
 
 	var IsPublisher bool = false
+
 	for _, pub := range pubs {
 		if client == pub{
 			IsPublisher=true
 		}
 	}
+	
+	if len(pubs) == 0 {
+		channel.Publisher = append(channel.Publisher, client)
+	}	
+	
 	
 	if IsPublisher || client.Role == string(utils.RoleSystem) || client.Role == string(utils.RoleAdmin) {
 		for _, sub := range subs {
@@ -286,10 +292,10 @@ func GetClients(client *utils.NewClient,topic *SubrChannel, category string) []*
 
 func GetAllMembers(client *utils.NewClient,subOrPub string) []*utils.NewClient{
 
-	if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
-		return []*utils.NewClient{}
-	}
-	logger.InfoLog(" "+client.Role+" : Broadcasted a message across all topics")
+	// if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
+	// 	return []*utils.NewClient{}
+	// }
+	logger.InfoLog(" "+client.Role+" : Invoked all the members of all the topics")
 	
 	Helper.Mu.Lock()
 	topicsChannel := make([]*SubrChannel,len(Helper.Channels))

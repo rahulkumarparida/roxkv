@@ -9,32 +9,34 @@ import (
 	"sync"
 
 	"github.com/ollama/ollama/api"
-	storageagent "github.com/rahulkumarparida/roxkv/agents/StorageAgent"
+	pubsubagent "github.com/rahulkumarparida/roxkv/agents/PubSubAgent"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
+var cmutex = sync.Mutex{}
 
-func handleChatConnection(user *utils.NewClient,stre *store.MemoryAlloc,namespace *store.NameSpace,agent *api.Client){
+
+
+func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, namespace *store.NameSpace, agent *api.Client) {
 
 	reader := bufio.NewReader(user.Conn)
 
 	msg := fmt.Sprintln("Total Users Connected: ", len(utils.TotalConnecntions))
 	user.Conn.Write([]byte(msg))
-	mutex := sync.Mutex{}
+
+	defer user.Conn.Close()
 
 	for {
-		
+
 		input, err := reader.ReadString('\n')
 		print(input)
 
-		mutex.Lock()
+		cmutex.Lock()
 		user.Interactions += 1
 		utils.TotalInputs += 1
-		mutex.Unlock()
-		
-
+		cmutex.Unlock()
 
 		if err != nil {
 			if err == io.EOF {
@@ -48,26 +50,23 @@ func handleChatConnection(user *utils.NewClient,stre *store.MemoryAlloc,namespac
 		}
 
 		// Gets the data from type interface{}/any to string and then writes to byte
-		// kvagent.KvAgent(input,stre,user,namespace,agent)
+		// kvagent.KvAgent(input, stre, user, namespace, agent)
 		// monitoragent.MonitorAgent(input,stre,user,agent)
-		storageagent.StorageAgent(input,stre,namespace,user,agent)
-		
-		
+		// storageagent.StorageAgent(input, stre, namespace, user, agent)
+		pubsubagent.PubSubAgent(input, stre, user, agent)
 
 	}
 
 }
 
-
-func ChatServer(stre *store.MemoryAlloc,namespace *store.NameSpace){
-	agent,err := api.ClientFromEnvironment()
+func ChatServer(stre *store.MemoryAlloc, namespace *store.NameSpace) {
+	agent, err := api.ClientFromEnvironment()
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel()
+	
 	listner, err := net.Listen("tcp", ":6970")
 
 	if err != nil {
@@ -87,17 +86,21 @@ func ChatServer(stre *store.MemoryAlloc,namespace *store.NameSpace){
 			continue
 		}
 
-		client := *utils.CreateClient(conn,"system")
+		
+		client := *utils.CreateClient(conn, "system")
 
+
+		cmutex.Lock()
 		if len(utils.TotalConnecntions) > MaxConnections {
 			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
 			client.Conn.Close()
 			continue
 		}
-
 		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
+		cmutex.Unlock()
+
 		fmt.Println("Connected: ", client.ID)
-		go handleChatConnection(&client, stre,namespace, agent)
+		go handleChatConnection(&client, stre, namespace, agent)
 
 	}
 

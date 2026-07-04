@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents"
 	"github.com/rahulkumarparida/roxkv/internal/metrics"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -34,7 +35,7 @@ func MonitorAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, 
 	}
 
 	req := &api.ChatRequest{
-		Model:    "llama3.2:3b",
+		Model:    agents.AGENT_USED,
 		Messages: Messages,
 		Tools: []api.Tool{
 			GetComputerUsageTool(),
@@ -52,6 +53,7 @@ func MonitorAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, 
 
 	var toolCallsToExecute []api.ToolCall
 	var assistantTextResponse string
+	var rawResponses []string
 
 	cerr := client.Chat(ctx, req, func(resp api.ChatResponse) error {
 		if len(resp.Message.ToolCalls) > 0 {
@@ -122,30 +124,11 @@ func MonitorAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, 
 				Role:    "tool",
 				Content: toolResult,
 			})
+			rawResponses = append(rawResponses, toolResult)
 		}
 
-		var finalResponse string
-
-		secondReq := &api.ChatRequest{
-			Model:    "llama3.2:3b",
-			Messages: Messages,
-			Stream:   &stream,
-			Options:  MonitorInference,
-		}
-
-		secondErr := client.Chat(ctx, secondReq, func(resp api.ChatResponse) error {
-			if resp.Message.Content != "" {
-				finalResponse = resp.Message.Content
-			}
-			return nil
-		})
-
-		if secondErr != nil {
-			log.Fatalf("Second Ollama API call failed: %v", secondErr)
-		}
-
-		if finalResponse != "" {
-			user.Conn.Write([]byte("\nroxai> " + finalResponse + "\n"))
+		if len(rawResponses) > 0 {
+			user.Conn.Write([]byte("\nroxai> " + strings.Join(rawResponses, "\n") + "\n"))
 		}
 
 		return

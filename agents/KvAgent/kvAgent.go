@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents"
 	"github.com/rahulkumarparida/roxkv/internal/commands"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -35,7 +35,7 @@ func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, names
 	}
 	// User will send a query
 	req := &api.ChatRequest{
-		Model:    "llama3.2:3b",
+		Model:    agents.AGENT_USED,
 		Messages: Message,
 		Tools:    []api.Tool{GetKeyTool(), SetKeyTool(), KeysTool(), DeleteKeyTool(), SaveTool(), LoadTool()},
 		Stream:   &stream,
@@ -68,7 +68,7 @@ func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, names
 			ToolCalls: toolCallsToExecute,
 		})
 
-		var finalResponse string = "null"
+		var finalResponse []any 
 
 		for _, tool := range toolCallsToExecute {
 
@@ -90,7 +90,7 @@ func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, names
 				// 	Role:    "tool",
 				// 	Content: values,
 				// })
-				finalResponse = values
+				finalResponse = append(finalResponse, values)
 
 			case "set":
 				var args struct {
@@ -116,7 +116,7 @@ func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, names
 				result := store.SetKv(stre, namespace, &item)
 
 				values := fmt.Sprintf("%v", result)
-				finalResponse = values
+				finalResponse = append(finalResponse, values)
 				// Message = append(Message, api.Message{
 				// 	Role:    "tool",
 				// 	Content: values,
@@ -136,12 +136,12 @@ func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, names
 				// 	Role:    "tool",
 				// 	Content: values,
 				// })
-				finalResponse = values
+				finalResponse = append(finalResponse, values)
 
 			case "keys":
 				result := store.KeyKv(stre)
 				values := fmt.Sprintf("%v", result)
-				finalResponse = values
+				finalResponse = append(finalResponse, values)
 
 				// Message = append(Message, api.Message{
 				// 	Role:    "tool",
@@ -150,7 +150,7 @@ func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, names
 
 			case "save":
 				values := commands.SaveCommand(stre)
-				finalResponse = values
+				finalResponse = append(finalResponse, values)
 
 				// Message = append(Message, api.Message{
 				// 	Role:    "tool",
@@ -159,7 +159,7 @@ func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, names
 			case "load":
 				total := commands.LoaderCommand(stre, namespace)
 
-				finalResponse = strconv.Itoa(total)
+				finalResponse = append(finalResponse, total)
 
 				// Message = append(Message, api.Message{
 				// 	Role:    "tool",
@@ -170,38 +170,14 @@ func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, names
 				// 	Role:    "tool",
 				// 	Content: "No Tools found",
 				// })
-				finalResponse = "No Tools Found"
+				continue
 			}
 
 		}
-		// Finnaly asks for a message response for the given query ans tools executed
+		
+		value := fmt.Sprintf("%v",finalResponse)
 
-		// secondReq := &api.ChatRequest{
-		// 	Model: "llama3.2:3b",
-		// 	Messages: Message,
-		// 	Stream: &stream,
-		// 	Options: KvInference,
-		// }
-
-		// secondErr := client.Chat(ctx, secondReq, func(resp api.ChatResponse) error {
-		// 	fmt.Printf("Executes after sending the final response %+v\n", Message)
-		// 	fmt.Printf("%+v\n", req.Messages)
-		// 	if resp.Message.Content != "" {
-		// 		finalResponse = resp.Message.Content
-		// 	}
-		// 	return nil
-		// })
-
-		// if secondErr != nil {
-		// 	log.Fatalf("Second Ollama API call failed: %v", secondErr)
-		// }
-
-		// // 2. Print the model's final conversational answer to the user
-		// if finalResponse != "" {
-		// 	user.Conn.Write([]byte("roxai> " + finalResponse + "\n"))
-		// }
-
-		user.Conn.Write([]byte("\nroxai> " + finalResponse + "\n"))
+		user.Conn.Write([]byte("\nroxai> " + value + "\n"))
 
 		return
 

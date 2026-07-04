@@ -20,9 +20,11 @@ import (
 
 const MaxConnections = 5
 
+var mutex = sync.RWMutex{}
 
 func DeleteClientListing(target *utils.NewClient) {
-
+	mutex.Lock()
+	defer mutex.Unlock()
 	utils.TotalConnecntions = slices.DeleteFunc(utils.TotalConnecntions, func(n *utils.NewClient) bool {
 
 		return n.ID == target.ID
@@ -37,21 +39,27 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc, namespa
 
 	msg := fmt.Sprintln("Total Users Connected: ", len(utils.TotalConnecntions))
 	client.Conn.Write([]byte(msg))
-	mutex := sync.Mutex{}
+
+	defer cancel()
+	defer client.Conn.Close()
+	defer DeleteClientListing(client)
+
+	go DeadOrAliveConnections(ctx, client)
+	go worker.ExpiryWorker(ctx, store)
 
 	for {
-		
+
 		input, err := reader.ReadString('\n')
 		print(input)
 
-		go DeadOrAliveConnections(ctx, client)
-		go worker.ExpiryWorker(ctx, store)
 		mutex.Lock()
-		client.Interactions += 1
 		utils.TotalInputs += 1
 		mutex.Unlock()
-		
 
+		client.Mu.Lock()
+		client.Interactions += 1
+		client.LastUsed = time.Now()
+		client.Mu.Unlock()
 
 		if err != nil {
 			if err == io.EOF {
@@ -66,12 +74,9 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc, namespa
 		}
 
 		// Gets the data from type interface{}/any to string and then writes to byte
-		data := commands.ParseCommands(store,namespace,strings.Fields(input),client)
+		data := commands.ParseCommands(store, namespace, strings.Fields(input), client)
 		datastr := fmt.Sprintf("%v", data)
 		_, werr := client.Conn.Write([]byte("roxkv> " + datastr + " \n"))
-		client.Mu.Lock()
-		client.LastUsed = time.Now()
-		client.Mu.Unlock()
 
 		if werr != nil {
 			fmt.Println("err:", werr)
@@ -80,14 +85,10 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc, namespa
 
 	}
 
-	defer cancel()
-
-	DeleteClientListing(client)
-	defer client.Conn.Close()
 }
 
 func ClearConnections(t time.Time, client *utils.NewClient) {
-	if time.Since(client.LastUsed) > (10*time.Minute) {
+	if time.Since(client.LastUsed) > (10 * time.Minute) {
 		fmt.Println("Client died: ", client.ID)
 		client.Conn.Write([]byte("Client was Inactive for too long \n"))
 		client.Conn.Close()
@@ -112,10 +113,8 @@ func DeadOrAliveConnections(ctx context.Context, client *utils.NewClient) {
 	}
 }
 
-
-
 func Server() {
-	store , namespace := store.StoreInMemory()
+	store, namespace := store.StoreInMemory()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	listner, err := net.Listen("tcp", ":6969")
@@ -127,14 +126,12 @@ func Server() {
 	}
 	defer listner.Close()
 	utils.ServerStarted = time.Now()
-	mutex :=  sync.RWMutex{}
-	go worker.SnapshotWorker(ctx,store,&mutex, utils.TotalConnecntions)
-	fmt.Println("Listening at localhost:6969")
-	go ChatServer(store,namespace)			
-	
-	for {
-		
 
+	go worker.SnapshotWorker(ctx, store, &mutex, utils.TotalConnecntions)
+	fmt.Println("Listening at localhost:6969")
+	go ChatServer(store, namespace)
+
+	for {
 
 		conn, err := listner.Accept()
 
@@ -144,19 +141,18 @@ func Server() {
 			continue
 		}
 
-		client := *utils.CreateClient(conn,"client")
-
+		client := *utils.CreateClient(conn, "client")	
 		
-		
+		mutex.Lock()
 		if len(utils.TotalConnecntions) > MaxConnections {
 			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
 			client.Conn.Close()
 			continue
 		}
-
 		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
+		mutex.Unlock()
 		fmt.Println("Connected: ", client.ID)
-		go handleConnection(&client, store,namespace)
+		go handleConnection(&client, store, namespace)
 
 	}
 
