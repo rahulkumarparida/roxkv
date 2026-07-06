@@ -9,15 +9,13 @@ import (
 	"sync"
 
 	"github.com/ollama/ollama/api"
-	pubsubagent "github.com/rahulkumarparida/roxkv/agents/PubSubAgent"
+	masteragent "github.com/rahulkumarparida/roxkv/agents/Master"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
 var cmutex = sync.Mutex{}
-
-
 
 func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, namespace *store.NameSpace, agent *api.Client) {
 
@@ -49,11 +47,8 @@ func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, namesp
 			break
 		}
 
-		// Gets the data from type interface{}/any to string and then writes to byte
-		// kvagent.KvAgent(input, stre, user, namespace, agent)
-		// monitoragent.MonitorAgent(input,stre,user,agent)
-		// storageagent.StorageAgent(input, stre, namespace, user, agent)
-		pubsubagent.PubSubAgent(input, stre, user, agent)
+		// Route all requests through the master orchestrator so specialist-agent results are collected and summarized centrally.
+		masteragent.MasterAgent(input, stre, user, namespace, agent)
 
 	}
 
@@ -66,7 +61,6 @@ func ChatServer(stre *store.MemoryAlloc, namespace *store.NameSpace) {
 		log.Fatal(err)
 	}
 
-	
 	listner, err := net.Listen("tcp", ":6970")
 
 	if err != nil {
@@ -86,9 +80,7 @@ func ChatServer(stre *store.MemoryAlloc, namespace *store.NameSpace) {
 			continue
 		}
 
-		
 		client := *utils.CreateClient(conn, "system")
-
 
 		cmutex.Lock()
 		if len(utils.TotalConnecntions) > MaxConnections {

@@ -2,91 +2,84 @@ package kvagent
 
 import "github.com/ollama/ollama/api"
 
-
 var KvInference = map[string]any{
-    "num_predict": 200,   // Limit output to a maximum of 100 tokens
-    "num_ctx":     1048,  // Set total context window (input + output) to 2048 tokens
-    "temperature": 0.4,   // Lower temperature makes responses more focused and deterministic
-    "top_p":       0.9,   // Top-p sampling boundary
+	"num_predict": 200,  // Limit output to a maximum of 100 tokens
+	"num_ctx":     1048, // Set total context window (input + output) to 2048 tokens
+	"temperature": 0.4,  // Lower temperature makes responses more focused and deterministic
+	"top_p":       0.9,  // Top-p sampling boundary
 }
 
+func GetKeyTool() api.Tool {
 
-func GetKeyTool() api.Tool{
+	var properties = api.NewToolPropertiesMap()
 
-var properties = api.NewToolPropertiesMap()
+	keyprop := api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "Exact key name to read from the in-memory store. Use a single stored key identifier.",
+	}
 
-keyprop := api.ToolProperty{
-	Type: api.PropertyType{"string"},
-	Description: "The key is used to search through the in memopry database",
-}
+	properties.Set("key", keyprop)
 
-properties.Set("key",keyprop)
-
-toolParams := api.ToolFunctionParameters{
+	toolParams := api.ToolFunctionParameters{
 		Type:       "object",
 		Properties: properties,
 		Required:   []string{"key"},
 	}
 
+	var GetKeyValueTool = api.Tool{
+		Type: "function",
+		Function: api.ToolFunction{
+			Name:        "get",
+			Description: "Purpose: read one stored value by key. Inputs: key string. Output: the value currently stored for that key. Use when the request asks for an exact key lookup. Do not use for listing keys, writing data, or storage analytics.",
+			Parameters:  toolParams,
+		},
+	}
+	return GetKeyValueTool
 
-var GetKeyValueTool = api.Tool{
-	Type: "function",
-	Function: api.ToolFunction{
-		Name:        "get",
-		Description: "Use this tool to retrieve, fetch, look up, or read the stored value of a specific key from the database memory.",
-		Parameters:  toolParams,
-	},
-}
-return GetKeyValueTool
-
-}
-
-
-
-func SetKeyTool() api.Tool{
-
-var properties = api.NewToolPropertiesMap()
-
-keyprop := api.ToolProperty{
-	Type:        api.PropertyType{"string"},
-	Description: "The unique identifier or name of the key to look up, set, or modify in the database.",
 }
 
-valprop := api.ToolProperty{
-	Type:        api.PropertyType{"string"},
-	Description: "The actual data payload or content to assign and store under the specified key.",
-}
+func SetKeyTool() api.Tool {
 
-properties.Set("key",keyprop)
-properties.Set("value",valprop)
+	var properties = api.NewToolPropertiesMap()
 
-toolParams := api.ToolFunctionParameters{
-		Type:       "object",
-		Properties: properties,
-		Required:   []string{"key","value"},
+	keyprop := api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "Exact key name to create or overwrite in the in-memory store.",
 	}
 
+	valprop := api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "String value to store under the provided key.",
+	}
 
-var SetKeyValueTool = api.Tool{
-	Type: "function",
-	Function: api.ToolFunction{
-		Name:        "set",
-		Description: "Use this tool to create, store, save, or update a key-value pair in the database memory.",
-		Parameters:  toolParams,
-	},
+	properties.Set("key", keyprop)
+	properties.Set("value", valprop)
+
+	toolParams := api.ToolFunctionParameters{
+		Type:       "object",
+		Properties: properties,
+		Required:   []string{"key", "value"},
+	}
+
+	var SetKeyValueTool = api.Tool{
+		Type: "function",
+		Function: api.ToolFunction{
+			Name:        "set",
+			Description: "Purpose: create or overwrite one key-value pair in memory. Inputs: key string, value string. Output: boolean-style write result from the store. Use when the request explicitly asks to save, set, or update a key. Do not use for reads, deletes, or disk persistence.",
+			Parameters:  toolParams,
+		},
+	}
+
+	return SetKeyValueTool
+
 }
-
-return SetKeyValueTool
-
-}
-
 
 func DeleteKeyTool() api.Tool {
 	var properties = api.NewToolPropertiesMap()
 
 	keyprop := api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "The unique identifier or name of the key to remove from the database.",
+		Description: "Exact key name to remove from the in-memory store.",
 	}
 
 	properties.Set("key", keyprop)
@@ -101,14 +94,13 @@ func DeleteKeyTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "del",
-			Description: "Use this tool to delete, remove, or erase a specific key and its associated value from the database memory. Only when explicitly mentioned remove or delete or erase a key",
+			Description: "Purpose: delete one key and its value from memory. Inputs: key string. Output: boolean-style deletion result. Use when the request explicitly asks to delete or remove a key. Do not use for reads, listings, or persistence.",
 			Parameters:  toolParams,
 		},
 	}
 
 	return DeleteValueTool
 }
-
 
 func KeysTool() api.Tool {
 	var properties = api.NewToolPropertiesMap()
@@ -123,7 +115,7 @@ func KeysTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "keys",
-			Description: "Use this tool to list, retrieve, or fetch all existing keys, identifiers currently stored in the database memory.",
+			Description: "Purpose: list every key currently present in the in-memory store. Inputs: none. Output: array of key names. Use when the request asks to enumerate keys. Do not use for reading one value, writing data, or metadata analysis.",
 			Parameters:  toolParams,
 		},
 	}
@@ -131,21 +123,20 @@ func KeysTool() api.Tool {
 	return ListKeysTool
 }
 
-
 func SaveTool() api.Tool {
 	var properties = api.NewToolPropertiesMap()
 
 	toolParams := api.ToolFunctionParameters{
 		Type:       "object",
 		Properties: properties,
-		Required:   []string{}, 
+		Required:   []string{},
 	}
 
 	var SaveDiskTool = api.Tool{
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "save",
-			Description: "Use this tool to persist, commit, write, or save the current database memory snapshot onto the disk or hard drive for data persistence.",
+			Description: "Purpose: persist the current in-memory database to disk. Inputs: none. Output: save status string from the persistence command. Use when the request asks to save current state. Do not use for reading from disk or inspecting snapshot health.",
 			Parameters:  toolParams,
 		},
 	}
@@ -153,21 +144,20 @@ func SaveTool() api.Tool {
 	return SaveDiskTool
 }
 
-
 func LoadTool() api.Tool {
 	var properties = api.NewToolPropertiesMap()
 
 	toolParams := api.ToolFunctionParameters{
 		Type:       "object",
 		Properties: properties,
-		Required:   []string{}, 
+		Required:   []string{},
 	}
 
 	var LoadDiskTool = api.Tool{
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "load",
-			Description: "Use this tool to read, restore, load, or recover previously persisted key-value data from the disk or hard drive back into active database memory.",
+			Description: "Purpose: load previously persisted key-value data from disk into memory. Inputs: none. Output: number of records loaded. Use when the request asks to restore saved data. Do not use for saving, reading one key, or listing keys already in memory.",
 			Parameters:  toolParams,
 		},
 	}

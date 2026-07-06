@@ -14,129 +14,98 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-func MonitorAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, client *api.Client) {
+const monitorSystemPrompt = `You are the RoxKV monitoring worker.
+You are not a conversational assistant.
+Use only the provided monitoring tools to execute the request.
+Return raw tool results only.
+Do not summarize, explain, recommend, or invent metrics.
+If no available tool can satisfy the request, return a structured error.`
+
+func MonitorAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, client *api.Client) string {
 	_ = stre
 
 	ctx := context.Background()
-	stream := false
+	session := agents.GetSession("monitoragent", monitorSystemPrompt, user)
 
-	Messages := []api.Message{
-		{
-			Role: "system",
-			Content: `You are an AI monitoring assistant.
-		Use monitoring tools to collect live system information.
-		Never estimate or invent metrics.
-		After gathering data, explain it in a clear and concise way.`,
-		},
-		{
-			Role:    "user",
-			Content: query,
-		},
+	tools := []api.Tool{
+		GetComputerUsageTool(),
+		GetCPUUsageTool(),
+		GetRAMUsageTool(),
+		GetDiskUsageTool(),
+		GetRuntimeStatsTool(),
+		GetServerUptimeTool(),
+		GetConnectedClientsTool(),
+		GetCommandCountTool(),
 	}
 
-	req := &api.ChatRequest{
-		Model:    agents.AGENT_USED,
-		Messages: Messages,
-		Tools: []api.Tool{
-			GetComputerUsageTool(),
-			GetCPUUsageTool(),
-			GetRAMUsageTool(),
-			GetDiskUsageTool(),
-			GetRuntimeStatsTool(),
-			GetServerUptimeTool(),
-			GetConnectedClientsTool(),
-			GetCommandCountTool(),
-		},
-		Stream:  &stream,
-		Options: MonitorInference,
-	}
-
-	var toolCallsToExecute []api.ToolCall
-	var assistantTextResponse string
-	var rawResponses []string
-
-	cerr := client.Chat(ctx, req, func(resp api.ChatResponse) error {
-		if len(resp.Message.ToolCalls) > 0 {
-			toolCallsToExecute = resp.Message.ToolCalls
-		}
-		if resp.Message.Content != "" {
-			assistantTextResponse = resp.Message.Content
-		}
-		return nil
-	})
-
+	toolCallsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, tools, MonitorInference)
 	if cerr != nil {
-		log.Fatalf("First Ollama API call failed: %v", cerr)
+		log.Fatalf("Monitor worker API call failed: %v", cerr)
 	}
 
-	if len(toolCallsToExecute) > 0 {
-		Messages = append(Messages, api.Message{
-			Role:      "assistant",
-			ToolCalls: toolCallsToExecute,
-		})
+	if len(toolCallsToExecute) == 0 {
+		if strings.TrimSpace(assistantTextResponse) == "" {
+			return agents.StructuredError("no_suitable_tool", "The monitoring worker could not match the request to an available monitoring tool.")
+		}
+		return agents.StructuredError("no_suitable_tool", strings.TrimSpace(assistantTextResponse))
+	}
 
-		for _, tool := range toolCallsToExecute {
-			argsByte, _ := json.Marshal(tool.Function.Arguments)
-			var toolResult string
+	var rawResults []string
+	var results []agents.ToolResult
+	for _, tool := range toolCallsToExecute {
+		argsByte, _ := json.Marshal(tool.Function.Arguments)
+		var toolResult string
 
-			switch tool.Function.Name {
-			case "get_computer_usage":
-				toolResult = marshalMonitorResult(metrics.GetComputerUsage())
-			case "get_cpu_usage":
-				toolResult = metrics.GetCPUUsage()
-			case "get_ram_usage":
-				toolResult = marshalMonitorResult(metrics.GetRAMUsage())
-			case "get_disk_usage":
-				var args struct {
-					Path string `json:"path"`
-				}
-				json.Unmarshal(argsByte, &args)
+		switch tool.Function.Name {
+		case "get_computer_usage":
+			toolResult = marshalMonitorResult(metrics.GetComputerUsage())
+		case "get_cpu_usage":
+			toolResult = metrics.GetCPUUsage()
+		case "get_ram_usage":
+			toolResult = marshalMonitorResult(metrics.GetRAMUsage())
+		case "get_disk_usage":
+			var args struct {
+				Path string `json:"path"`
+			}
+			_ = json.Unmarshal(argsByte, &args)
 
-				path := strings.TrimSpace(args.Path)
-				if path == "" {
-					path = "/"
-				}
-
-				disk := metrics.GetDiskUsage(path)
-				if disk.Err != nil {
-					toolResult = fmt.Sprintf("failed to fetch disk usage for %q: %v", path, disk.Err)
-				} else {
-					toolResult = marshalMonitorResult(map[string]any{
-						"path":         path,
-						"total_gb":     disk.Total,
-						"free_gb":      disk.Free,
-						"available_gb": disk.Avaliable,
-					})
-				}
-			case "get_runtime_stats":
-				toolResult = marshalMonitorResult(metrics.GetRuntimeStats())
-			case "get_server_uptime":
-				toolResult = metrics.GetServerUptime().String()
-			case "get_connected_clients":
-				toolResult = marshalMonitorResult(metrics.GetConnectedClients())
-			case "get_command_count":
-				toolResult = fmt.Sprintf("%d", metrics.GetCommandCount())
-			default:
-				toolResult = "No Tools found"
+			path := strings.TrimSpace(args.Path)
+			if path == "" {
+				path = "/"
 			}
 
-			Messages = append(Messages, api.Message{
-				Role:    "tool",
-				Content: toolResult,
-			})
-			rawResponses = append(rawResponses, toolResult)
+			disk := metrics.GetDiskUsage(path)
+			if disk.Err != nil {
+				toolResult = agents.StructuredError("disk_usage_failed", fmt.Sprintf("failed to fetch disk usage for %q: %v", path, disk.Err))
+			} else {
+				toolResult = marshalMonitorResult(map[string]any{
+					"path":         path,
+					"total_gb":     disk.Total,
+					"free_gb":      disk.Free,
+					"available_gb": disk.Avaliable,
+				})
+			}
+		case "get_runtime_stats":
+			toolResult = marshalMonitorResult(metrics.GetRuntimeStats())
+		case "get_server_uptime":
+			toolResult = metrics.GetServerUptime().String()
+		case "get_connected_clients":
+			toolResult = marshalMonitorResult(metrics.GetConnectedClients())
+		case "get_command_count":
+			toolResult = fmt.Sprintf("%d", metrics.GetCommandCount())
+		default:
+			toolResult = agents.StructuredError("unknown_tool", "The monitoring worker received an unsupported tool call.")
 		}
 
-		if len(rawResponses) > 0 {
-			user.Conn.Write([]byte("\nroxai> " + strings.Join(rawResponses, "\n") + "\n"))
-		}
-
-		return
+		rawResults = append(rawResults, toolResult)
+		results = append(results, agents.ToolResult{
+			Tool:   tool.Function.Name,
+			Output: agents.ParseToolOutput(toolResult),
+		})
 	}
 
-	if assistantTextResponse != "" {
-		user.Conn.Write([]byte("\nroxai> " + assistantTextResponse + "\n"))
-	}
+	session.AppendToolResults(rawResults...)
+	return agents.StructuredSuccess(results)
 }
 
 func marshalMonitorResult(value any) string {

@@ -32,126 +32,94 @@ type pubsubRemoveUserArgs struct {
 	Reason      string `json:"reason"`
 }
 
-func PubSubAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, client *api.Client) {
+const pubsubSystemPrompt = `You are the RoxKV pubsub worker.
+You are not a conversational assistant.
+Use only the provided pubsub tools to inspect or mutate topic state.
+Return raw tool results only.
+Do not summarize, explain, speculate, or invent topic data.
+If no available tool can satisfy the request, return a structured error.`
+
+func PubSubAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, client *api.Client) string {
 	_ = stre
 
 	ctx := context.Background()
-	stream := false
-
-	messages := []api.Message{
-		{
-			Role: "system",
-			Content: `You are an AI pubsub operations assistant for a topic-based messaging server.
-Use pubsub tools whenever topic names, subscribers, publishers, topic history, or broadcast actions are needed.
-Never invent topic state or client state.
-After gathering data, explain the pubsub state clearly and mention operational risks when relevant.`,
-		},
-		{
-			Role:    "user",
-			Content: query,
-		},
+	session := agents.GetSession("pubsubagent", pubsubSystemPrompt, user)
+	tools := []api.Tool{
+		GetAllTopicsOnlineTool(),
+		GetAllSubscribersTool(),
+		GetAllPublishersTool(),
+		GetPublishersTool(),
+		GetSubscribersTool(),
+		GetTopicStatisticsTool(),
+		GetInactiveTopicsTool(),
+		BroadcastToTopicTool(),
+		BroadcastEverywhereTool(),
+		HistoryOfTopicTool(),
+		DeleteTopicTool(),
+		CreateTopicTool(),
+		RemoveUserTool(),
 	}
 
-	req := &api.ChatRequest{
-		Model:    agents.AGENT_USED,
-		Messages: messages,
-		Tools: []api.Tool{
-			GetAllTopicsOnlineTool(),
-			GetAllSubscribersTool(),
-			GetAllPublishersTool(),
-			GetPublishersTool(),
-			GetSubscribersTool(),
-			GetTopicStatisticsTool(),
-			GetInactiveTopicsTool(),
-			BroadcastToTopicTool(),
-			BroadcastEverywhereTool(),
-			HistoryOfTopicTool(),
-			DeleteTopicTool(),
-			CreateTopicTool(),
-			RemoveUserTool(),
-		},
-		Stream:  &stream,
-		Options: PubSubInference,
-	}
-
-	var toolCallsToExecute []api.ToolCall
-	var assistantTextResponse string
-	var rawResponses []string
-
-	cerr := client.Chat(ctx, req, func(resp api.ChatResponse) error {
-		if len(resp.Message.ToolCalls) > 0 {
-			toolCallsToExecute = resp.Message.ToolCalls
-		}
-		if resp.Message.Content != "" {
-			assistantTextResponse = resp.Message.Content
-		}
-		return nil
-	})
-
+	toolCallsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, tools, PubSubInference)
 	if cerr != nil {
-		log.Fatalf("First Ollama API call failed: %v", cerr)
+		log.Fatalf("PubSub worker API call failed: %v", cerr)
 	}
 
-	if len(toolCallsToExecute) > 0 {
-		messages = append(messages, api.Message{
-			Role:      "assistant",
-			ToolCalls: toolCallsToExecute,
+	if len(toolCallsToExecute) == 0 {
+		if strings.TrimSpace(assistantTextResponse) == "" {
+			return agents.StructuredError("no_suitable_tool", "The pubsub worker could not match the request to an available pubsub tool.")
+		}
+		return agents.StructuredError("no_suitable_tool", strings.TrimSpace(assistantTextResponse))
+	}
+
+	var rawResults []string
+	var results []agents.ToolResult
+	for _, tool := range toolCallsToExecute {
+		argsByte, _ := json.Marshal(tool.Function.Arguments)
+		var toolResult string
+
+		switch tool.Function.Name {
+		case "get_all_topics_online":
+			toolResult = marshalPubSubResult(metrics.GetAllTopicsOnline(user))
+		case "get_all_subscribers":
+			toolResult = marshalPubSubResult(metrics.GetAllSubscribers(user))
+		case "get_all_publishers":
+			toolResult = marshalPubSubResult(metrics.GetAllPublisher(user))
+		case "get_publishers":
+			toolResult = marshalPubSubResult(metrics.GetPublishers(user, parseTopic(argsByte)))
+		case "get_subscribers":
+			toolResult = marshalPubSubResult(metrics.GetSubscribers(user, parseTopic(argsByte)))
+		case "get_topic_statistics":
+			toolResult = marshalPubSubResult(metrics.GetTopicStatistics(user, parseTopic(argsByte)))
+		case "get_inactive_topics":
+			toolResult = marshalPubSubResult(metrics.GetInactiveTopics(user))
+		case "broadcast_to_topic":
+			topic, message := parseTopicMessage(argsByte)
+			toolResult = marshalPubSubResult(metrics.BroadcastToTopic(user, topic, message))
+		case "broadcast_everywhere":
+			toolResult = marshalPubSubResult(metrics.BroadcastEverywhere(user, parseMessage(argsByte)))
+		case "history_of_topic":
+			toolResult = marshalPubSubResult(metrics.HistoryOfTopic(user, parseTopic(argsByte)))
+		case "delete_topic":
+			toolResult = marshalPubSubResult(metrics.DeleteTopic(user, parseTopic(argsByte)))
+		case "create_topic":
+			toolResult = marshalPubSubResult(metrics.CreateTopic(user, parseTopic(argsByte)))
+		case "remove_user":
+			portAddress, reason := parseRemoveUserArgs(argsByte)
+			toolResult = marshalPubSubResult(metrics.RemoveUser(user, portAddress, reason))
+		default:
+			toolResult = agents.StructuredError("unknown_tool", "The pubsub worker received an unsupported tool call.")
+		}
+
+		rawResults = append(rawResults, toolResult)
+		results = append(results, agents.ToolResult{
+			Tool:   tool.Function.Name,
+			Output: agents.ParseToolOutput(toolResult),
 		})
-
-		for _, tool := range toolCallsToExecute {
-			argsByte, _ := json.Marshal(tool.Function.Arguments)
-			var toolResult string
-
-			switch tool.Function.Name {
-			case "get_all_topics_online":
-				toolResult = marshalPubSubResult(metrics.GetAllTopicsOnline(user))
-			case "get_all_subscribers":
-				toolResult = marshalPubSubResult(metrics.GetAllSubscribers(user))
-			case "get_all_publishers":
-				toolResult = marshalPubSubResult(metrics.GetAllPublisher(user))
-			case "get_publishers":
-				toolResult = marshalPubSubResult(metrics.GetPublishers(user, parseTopic(argsByte)))
-			case "get_subscribers":
-				toolResult = marshalPubSubResult(metrics.GetSubscribers(user, parseTopic(argsByte)))
-			case "get_topic_statistics":
-				toolResult = marshalPubSubResult(metrics.GetTopicStatistics(user, parseTopic(argsByte)))
-			case "get_inactive_topics":
-				toolResult = marshalPubSubResult(metrics.GetInactiveTopics(user))
-			case "broadcast_to_topic":
-				topic, message := parseTopicMessage(argsByte)
-				toolResult = marshalPubSubResult(metrics.BroadcastToTopic(user, topic, message))
-			case "broadcast_everywhere":
-				toolResult = marshalPubSubResult(metrics.BroadcastEverywhere(user, parseMessage(argsByte)))
-			case "history_of_topic":
-				toolResult = marshalPubSubResult(metrics.HistoryOfTopic(user, parseTopic(argsByte)))
-			case "delete_topic":
-				toolResult = marshalPubSubResult(metrics.DeleteTopic(user, parseTopic(argsByte)))
-			case "create_topic":
-				toolResult = marshalPubSubResult(metrics.CreateTopic(user, parseTopic(argsByte)))
-			case "remove_user":
-				portAddress, reason := parseRemoveUserArgs(argsByte)
-				toolResult = marshalPubSubResult(metrics.RemoveUser(user, portAddress, reason))
-			default:
-				toolResult = "No Tools found"
-			}
-
-			messages = append(messages, api.Message{
-				Role:    "tool",
-				Content: toolResult,
-			})
-			rawResponses = append(rawResponses, toolResult)
-		}
-
-		if len(rawResponses) > 0 {
-			user.Conn.Write([]byte("\nroxai> " + strings.Join(rawResponses, "\n") + "\n"))
-		}
-
-		return
 	}
 
-	if assistantTextResponse != "" {
-		user.Conn.Write([]byte("\nroxai> " + assistantTextResponse + "\n"))
-	}
+	session.AppendToolResults(rawResults...)
+	return agents.StructuredSuccess(results)
 }
 
 func parseTopic(argsByte []byte) string {

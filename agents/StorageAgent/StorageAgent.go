@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/ollama/ollama/api"
@@ -36,132 +37,109 @@ type storageKeyMetadataSummary struct {
 	Namespace      string                `json:"namespace"`
 }
 
-func StorageAgent(query string, stre *store.MemoryAlloc, namespace *store.NameSpace, user *utils.NewClient, client *api.Client) {
+const storageSystemPrompt = `You are the RoxKV storage worker.
+You are not a conversational assistant.
+Use only the provided storage-analysis tools to inspect persistence, TTL, namespace, and key metadata state.
+Return raw tool results only.
+Do not summarize, explain, speculate, or invent database facts.
+If no available tool can satisfy the request, return a structured error.`
+
+func StorageAgent(query string, stre *store.MemoryAlloc, namespace *store.NameSpace, user *utils.NewClient, client *api.Client) string {
 	ctx := context.Background()
-	stream := false
-
-	messages := []api.Message{
-		{
-			Role: "system",
-			Content: `You are an AI storage analysis assistant for an in-memory key-value database.
-Use storage tools whenever database storage facts, TTL facts, snapshot facts, or key metadata are needed.
-Never estimate or invent database state.
-After gathering data, summarize the storage health, important patterns, and any risks or recommendations clearly.`,
-		},
-		{
-			Role:    "user",
-			Content: query,
-		},
+	session := agents.GetSession("storageagent", storageSystemPrompt, user)
+	tools := []api.Tool{
+		GetTotalKeysTool(),
+		GetLargestKeysTool(),
+		GetSmallestKeysTool(),
+		GetAverageValueSizeTool(),
+		GetNamespacesTool(),
+		GetTTLMetricsTool(),
+		GetExpiredKeysTool(),
+		GetUpcomingExpirationsTool(),
+		GetKeysWithoutTTLTool(),
+		GetSnapshotCountTool(),
+		GetLatestSnapshotTool(),
+		GetSnapshotSizeTool(),
+		GetPersistenceHealthTool(),
+		GetOldestKeyTool(),
+		GetNewestKeyTool(),
+		GetMostAccessedKeyTool(),
+		GetLeastAccessedKeyTool(),
+		GetRecentlyModifiedKeysTool(),
 	}
 
-	req := &api.ChatRequest{
-		Model:    agents.AGENT_USED,
-		Messages: messages,
-		Tools: []api.Tool{
-			GetTotalKeysTool(),
-			GetLargestKeysTool(),
-			GetSmallestKeysTool(),
-			GetAverageValueSizeTool(),
-			GetNamespacesTool(),
-			GetTTLMetricsTool(),
-			GetExpiredKeysTool(),
-			GetUpcomingExpirationsTool(),
-			GetKeysWithoutTTLTool(),
-			GetSnapshotCountTool(),
-			GetLatestSnapshotTool(),
-			GetSnapshotSizeTool(),
-			GetPersistenceHealthTool(),
-			GetOldestKeyTool(),
-			GetNewestKeyTool(),
-			GetMostAccessedKeyTool(),
-			GetLeastAccessedKeyTool(),
-			GetRecentlyModifiedKeysTool(),
-		},
-		Stream:  &stream,
-		Options: StorageInference,
-	}
-
-	var toolCallsToExecute []api.ToolCall
-	var assistantTextResponse string
-
-	cerr := client.Chat(ctx, req, func(resp api.ChatResponse) error {
-		if len(resp.Message.ToolCalls) > 0 {
-			toolCallsToExecute = resp.Message.ToolCalls
-		}
-		if resp.Message.Content != "" {
-			assistantTextResponse = resp.Message.Content
-		}
-		return nil
-	})
-
+	toolCallsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, tools, StorageInference)
 	if cerr != nil {
-		log.Fatalf("First Ollama API call failed: %v", cerr)
+		log.Fatalf("Storage worker API call failed: %v", cerr)
 	}
 
-	if len(toolCallsToExecute) > 0 {
-		messages = append(messages, api.Message{
-			Role:      "assistant",
-			ToolCalls: toolCallsToExecute,
-		})
+	if len(toolCallsToExecute) == 0 {
+		if strings.TrimSpace(assistantTextResponse) == "" {
+			return agents.StructuredError("no_suitable_tool", "The storage worker could not match the request to an available storage tool.")
+		}
+		return agents.StructuredError("no_suitable_tool", strings.TrimSpace(assistantTextResponse))
+	}
 
-		var finalResponse []any
+	var rawResults []string
+	var results []agents.ToolResult
+	for _, tool := range toolCallsToExecute {
+		argsByte, _ := json.Marshal(tool.Function.Arguments)
+		var toolResult any
 
-		for _, tool := range toolCallsToExecute {
-			argsByte, _ := json.Marshal(tool.Function.Arguments)
-
-			switch tool.Function.Name {
-			case "get_total_keys":
-				finalResponse = append(finalResponse, metrics.GetTotalKeys(stre, namespace))
-			case "get_largest_keys":
-				finalResponse = append(finalResponse, metrics.GetLargestKeys(stre, namespace, parseTopN(argsByte)))
-			case "get_smallest_keys":
-				finalResponse = append(finalResponse, metrics.GetSmallestKeys(stre, namespace, parseTopN(argsByte)))
-			case "get_average_value_size":
-				finalResponse = append(finalResponse, metrics.GetAverageValueSize(stre, namespace))
-			case "get_namespaces":
-				finalResponse = append(finalResponse, metrics.GetNamespaces(stre, namespace))
-			case "get_ttl_metrics":
-				finalResponse = append(finalResponse, metrics.GetTTLMetrics())
-			case "get_expired_keys":
-				finalResponse = append(finalResponse, metrics.GetExpiredKeys(stre))
-			case "get_upcoming_expirations":
-				finalResponse = append(finalResponse, metrics.GetUpcomingExpirations(stre, parseTopN(argsByte)))
-			case "get_keys_without_ttl":
-				finalResponse = append(finalResponse, metrics.GetKeysWithoutTTL(stre))
-			case "get_snapshot_count":
-				finalResponse = append(finalResponse, metrics.GetSnapshotCount())
-			case "get_latest_snapshot":
-				finalResponse = append(finalResponse, metrics.GetLatestSnapshot())
-			case "get_snapshot_size":
-				finalResponse = append(finalResponse, metrics.GetSnapshotSize())
-			case "get_persistence_health":
-				finalResponse = append(finalResponse, metrics.GetPersistenceHealth())
-			case "get_oldest_key":
-				finalResponse = append(finalResponse, summarizeKeyMetadata(metrics.GetOldestKey(stre)))
-			case "get_newest_key":
-				finalResponse = append(finalResponse, summarizeKeyMetadata(metrics.GetNewestKey(stre)))
-			case "get_most_accessed_key":
-				finalResponse = append(finalResponse, summarizeKeyMetadata(metrics.GetMostAccessedKey(stre)))
-			case "get_least_accessed_key":
-				finalResponse = append(finalResponse, summarizeKeyMetadata(metrics.GetLeastAccessedKey(stre)))
-			case "get_recently_modified_keys":
-				finalResponse = append(finalResponse, summarizeKeyMetadataSlice(metrics.GetRecentlyModifiedKeys(stre, parseTopN(argsByte))))
-			default:
-				continue
+		switch tool.Function.Name {
+		case "get_total_keys":
+			toolResult = metrics.GetTotalKeys(stre, namespace)
+		case "get_largest_keys":
+			toolResult = metrics.GetLargestKeys(stre, namespace, parseTopN(argsByte))
+		case "get_smallest_keys":
+			toolResult = metrics.GetSmallestKeys(stre, namespace, parseTopN(argsByte))
+		case "get_average_value_size":
+			toolResult = metrics.GetAverageValueSize(stre, namespace)
+		case "get_namespaces":
+			toolResult = metrics.GetNamespaces(stre, namespace)
+		case "get_ttl_metrics":
+			toolResult = metrics.GetTTLMetrics()
+		case "get_expired_keys":
+			toolResult = metrics.GetExpiredKeys(stre)
+		case "get_upcoming_expirations":
+			toolResult = metrics.GetUpcomingExpirations(stre, parseTopN(argsByte))
+		case "get_keys_without_ttl":
+			toolResult = metrics.GetKeysWithoutTTL(stre)
+		case "get_snapshot_count":
+			toolResult = metrics.GetSnapshotCount()
+		case "get_latest_snapshot":
+			toolResult = metrics.GetLatestSnapshot()
+		case "get_snapshot_size":
+			toolResult = metrics.GetSnapshotSize()
+		case "get_persistence_health":
+			toolResult = metrics.GetPersistenceHealth()
+		case "get_oldest_key":
+			toolResult = summarizeKeyMetadata(metrics.GetOldestKey(stre))
+		case "get_newest_key":
+			toolResult = summarizeKeyMetadata(metrics.GetNewestKey(stre))
+		case "get_most_accessed_key":
+			toolResult = summarizeKeyMetadata(metrics.GetMostAccessedKey(stre))
+		case "get_least_accessed_key":
+			toolResult = summarizeKeyMetadata(metrics.GetLeastAccessedKey(stre))
+		case "get_recently_modified_keys":
+			toolResult = summarizeKeyMetadataSlice(metrics.GetRecentlyModifiedKeys(stre, parseTopN(argsByte)))
+		default:
+			toolResult = map[string]any{
+				"status":  "error",
+				"error":   "unknown_tool",
+				"message": "The storage worker received an unsupported tool call.",
 			}
 		}
 
-		if len(finalResponse) > 0 {
-			value := fmt.Sprintf("%v", finalResponse)
-			user.Conn.Write([]byte("\nroxai> " + value + "\n"))
-		}
-
-		return
+		rawResults = append(rawResults, marshalStorageResult(toolResult))
+		results = append(results, agents.ToolResult{
+			Tool:   tool.Function.Name,
+			Output: toolResult,
+		})
 	}
 
-	if assistantTextResponse != "" {
-		user.Conn.Write([]byte("\nroxai> " + assistantTextResponse + "\n"))
-	}
+	session.AppendToolResults(rawResults...)
+	return agents.StructuredSuccess(results)
 }
 
 func parseTopN(argsByte []byte) int {

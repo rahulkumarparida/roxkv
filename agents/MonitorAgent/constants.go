@@ -21,7 +21,7 @@ func GetComputerUsageTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_computer_usage",
-			Description: "Returns overall computer information including username, operating system, CPU count, RAM usage, architecture, and number of running Go routines.And provide any recommendations depending on the machine informations.",
+			Description: "Purpose: return a host summary for the current machine. Inputs: none. Output: username, OS, architecture, CPU count, RAM stats, and goroutine count. Use when the request asks for overall machine information. Do not use for focused CPU, RAM, disk, or uptime queries.",
 			Parameters:  toolParams,
 		},
 	}
@@ -39,7 +39,7 @@ func GetCPUUsageTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_cpu_usage",
-			Description: "Returns the current CPU utilization percentage of the system.",
+			Description: "Purpose: return current CPU utilization. Inputs: none. Output: CPU usage percentage as a string. Use when the request is specifically about CPU load. Do not use for general host summaries or memory metrics.",
 			Parameters:  toolParams,
 		},
 	}
@@ -57,7 +57,7 @@ func GetRAMUsageTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_ram_usage",
-			Description: "Returns the current RAM statistics including total memory, free memory, and memory usage percentage.",
+			Description: "Purpose: return current RAM statistics. Inputs: none. Output: total RAM, free RAM, and used percentage. Use when the request is specifically about memory usage. Do not use for disk, CPU, or uptime questions.",
 			Parameters:  toolParams,
 		},
 	}
@@ -68,7 +68,7 @@ func GetDiskUsageTool() api.Tool {
 
 	pathProp := api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Filesystem path to inspect, for example '/' on Linux or 'C:\\' on Windows.",
+		Description: "Filesystem path whose disk stats should be inspected, such as '/' or '/home'.",
 	}
 
 	properties.Set("path", pathProp)
@@ -83,7 +83,7 @@ func GetDiskUsageTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_disk_usage",
-			Description: "Returns disk statistics for the specified filesystem path including total space, free space, and available space.",
+			Description: "Purpose: return disk capacity details for one filesystem path. Inputs: path string. Output: total, free, and available space in GB for that path. Use when the request is about disk usage for a specific mount or directory path. Do not use for RAM, CPU, or runtime stats.",
 			Parameters:  toolParams,
 		},
 	}
@@ -101,7 +101,7 @@ func GetRuntimeStatsTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_runtime_stats",
-			Description: "Returns Go runtime statistics including Go version, operating system, architecture, goroutine count, memory allocation, heap usage, and garbage collection information.",
+			Description: "Purpose: return Go runtime statistics for the RoxKV process. Inputs: none. Output: Go version, OS, arch, CPU count, goroutines, allocation, heap, and GC counters. Use when the request is about process/runtime internals. Do not use for host disk usage or client lists.",
 			Parameters:  toolParams,
 		},
 	}
@@ -119,7 +119,7 @@ func GetServerUptimeTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_server_uptime",
-			Description: "Returns how long the server has been running since it was started.",
+			Description: "Purpose: return RoxKV server uptime. Inputs: none. Output: elapsed duration since startup. Use when the request asks how long the server has been running. Do not use for resource metrics or client metadata.",
 			Parameters:  toolParams,
 		},
 	}
@@ -137,7 +137,7 @@ func GetConnectedClientsTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_connected_clients",
-			Description: "Returns metadata for all currently connected clients, including their ID, connection time, last activity time, and number of interactions.",
+			Description: "Purpose: return metadata for all connected clients. Inputs: none. Output: client IDs, connection times, last-used timestamps, and interaction counts. Use when the request is about active chat/server clients. Do not use for pubsub subscriber lists or system load.",
 			Parameters:  toolParams,
 		},
 	}
@@ -155,7 +155,7 @@ func GetCommandCountTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_command_count",
-			Description: "Returns the total number of commands or requests processed by the server since it started.",
+			Description: "Purpose: return the total number of requests processed since startup. Inputs: none. Output: integer command count. Use when the request asks for overall server activity volume. Do not use for per-client activity or key counts.",
 			Parameters:  toolParams,
 		},
 	}

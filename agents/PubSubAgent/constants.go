@@ -20,7 +20,7 @@ func GetAllTopicsOnlineTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_all_topics_online",
-			Description: "Returns the names of all currently available pubsub topics that exist on the server.",
+			Description: "Purpose: list all topics currently present in the pubsub system. Inputs: none. Output: array of topic names. Use when the request asks which topics exist. Do not use for subscriber details or message history.",
 			Parameters:  toolParams,
 		},
 	}
@@ -37,7 +37,7 @@ func GetAllSubscribersTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_all_subscribers",
-			Description: "Returns the current subscriber client data across all topics, including real client field values instead of pointer addresses.",
+			Description: "Purpose: return subscriber snapshots across all topics. Inputs: none. Output: subscriber client metadata grouped by topic. Use when the request asks for all subscribers globally. Do not use for one topic only or publisher data.",
 			Parameters:  toolParams,
 		},
 	}
@@ -54,7 +54,7 @@ func GetAllPublishersTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_all_publishers",
-			Description: "Returns the current publisher client data across all topics, including real client field values instead of pointer addresses.",
+			Description: "Purpose: return publisher snapshots across all topics. Inputs: none. Output: publisher client metadata grouped by topic. Use when the request asks for all publishers globally. Do not use for one topic only or subscriber data.",
 			Parameters:  toolParams,
 		},
 	}
@@ -64,7 +64,7 @@ func GetPublishersTool() api.Tool {
 	properties := api.NewToolPropertiesMap()
 	properties.Set("topic", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Topic name whose publishers should be returned.",
+		Description: "Exact topic name whose publishers should be returned.",
 	})
 
 	toolParams := api.ToolFunctionParameters{
@@ -77,7 +77,7 @@ func GetPublishersTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_publishers",
-			Description: "Returns publisher client data for a specific topic.",
+			Description: "Purpose: return publishers for one topic. Inputs: topic string. Output: publisher client metadata for that topic. Use when the request names a single topic. Do not use for all-topic listings or message history.",
 			Parameters:  toolParams,
 		},
 	}
@@ -87,7 +87,7 @@ func GetSubscribersTool() api.Tool {
 	properties := api.NewToolPropertiesMap()
 	properties.Set("topic", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Topic name whose subscribers should be returned.",
+		Description: "Exact topic name whose subscribers should be returned.",
 	})
 
 	toolParams := api.ToolFunctionParameters{
@@ -100,7 +100,7 @@ func GetSubscribersTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_subscribers",
-			Description: "Returns subscriber client data for a specific topic.",
+			Description: "Purpose: return subscribers for one topic. Inputs: topic string. Output: subscriber client metadata for that topic. Use when the request names a single topic. Do not use for global subscriber listings or publisher data.",
 			Parameters:  toolParams,
 		},
 	}
@@ -110,7 +110,7 @@ func GetTopicStatisticsTool() api.Tool {
 	properties := api.NewToolPropertiesMap()
 	properties.Set("topic", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Topic name whose pubsub statistics should be returned.",
+		Description: "Exact topic name whose full statistics should be returned.",
 	})
 
 	toolParams := api.ToolFunctionParameters{
@@ -123,7 +123,7 @@ func GetTopicStatisticsTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_topic_statistics",
-			Description: "Returns a full snapshot of a topic including subscribers, publishers, publish count, history, timestamps, and total message size.",
+			Description: "Purpose: return a full topic snapshot. Inputs: topic string. Output: publishers, subscribers, publish count, history, timestamps, and total message size for that topic. Use when the request needs detailed state for one topic. Do not use for simple existence checks.",
 			Parameters:  toolParams,
 		},
 	}
@@ -140,7 +140,7 @@ func GetInactiveTopicsTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "get_inactive_topics",
-			Description: "Returns topic snapshots ordered by creation time so older and likely inactive topics can be inspected.",
+			Description: "Purpose: return topic snapshots ordered for inactivity inspection. Inputs: none. Output: topic snapshots suitable for finding old or idle topics. Use when the request asks for inactive or stale topics. Do not use for active broadcast actions.",
 			Parameters:  toolParams,
 		},
 	}
@@ -150,11 +150,11 @@ func BroadcastToTopicTool() api.Tool {
 	properties := api.NewToolPropertiesMap()
 	properties.Set("topic", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Topic name that should receive the broadcast message.",
+		Description: "Exact topic name that should receive the message.",
 	})
 	properties.Set("message", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Message content to publish to the topic.",
+		Description: "Message payload to publish to that topic.",
 	})
 
 	toolParams := api.ToolFunctionParameters{
@@ -167,7 +167,7 @@ func BroadcastToTopicTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "broadcast_to_topic",
-			Description: "Publishes a message to one specific topic and returns whether the broadcast request succeeded.",
+			Description: "Purpose: publish one message to one topic. Inputs: topic string, message string. Output: broadcast result from the pubsub layer. Use when the request explicitly asks to send to a single topic. Do not use for all-topic broadcast or read-only inspection.",
 			Parameters:  toolParams,
 		},
 	}
@@ -177,7 +177,7 @@ func BroadcastEverywhereTool() api.Tool {
 	properties := api.NewToolPropertiesMap()
 	properties.Set("message", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Message content to publish across all topics.",
+		Description: "Message payload to publish across every topic.",
 	})
 
 	toolParams := api.ToolFunctionParameters{
@@ -190,7 +190,7 @@ func BroadcastEverywhereTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "broadcast_everywhere",
-			Description: "Publishes one message across every topic on the server and returns whether the broadcast request succeeded.",
+			Description: "Purpose: publish one message across all topics. Inputs: message string. Output: broadcast result from the pubsub layer. Use when the request explicitly asks for a global broadcast. Do not use for one-topic sends or topic inspection.",
 			Parameters:  toolParams,
 		},
 	}
@@ -200,7 +200,7 @@ func HistoryOfTopicTool() api.Tool {
 	properties := api.NewToolPropertiesMap()
 	properties.Set("topic", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Topic name whose message history should be returned.",
+		Description: "Exact topic name whose publish history should be returned.",
 	})
 
 	toolParams := api.ToolFunctionParameters{
@@ -213,7 +213,7 @@ func HistoryOfTopicTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "history_of_topic",
-			Description: "Returns the recorded publish history for a topic including message contents, sizes, and timestamps.",
+			Description: "Purpose: return publish history for one topic. Inputs: topic string. Output: recorded messages with sizes and timestamps. Use when the request asks what was published on a topic. Do not use for subscriber or publisher membership checks.",
 			Parameters:  toolParams,
 		},
 	}
@@ -223,7 +223,7 @@ func DeleteTopicTool() api.Tool {
 	properties := api.NewToolPropertiesMap()
 	properties.Set("topic", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Topic name to close and remove from the server.",
+		Description: "Exact topic name to delete from the pubsub system.",
 	})
 
 	toolParams := api.ToolFunctionParameters{
@@ -236,7 +236,7 @@ func DeleteTopicTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "delete_topic",
-			Description: "Deletes or closes a pubsub topic from the server and returns whether the operation succeeded.",
+			Description: "Purpose: delete one pubsub topic. Inputs: topic string. Output: deletion result from the pubsub layer. Use when the request explicitly asks to remove a topic. Do not use for message cleanup, history reads, or topic creation.",
 			Parameters:  toolParams,
 		},
 	}
@@ -246,7 +246,7 @@ func CreateTopicTool() api.Tool {
 	properties := api.NewToolPropertiesMap()
 	properties.Set("topic", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Topic name to create.",
+		Description: "Exact topic name to create.",
 	})
 
 	toolParams := api.ToolFunctionParameters{
@@ -259,7 +259,7 @@ func CreateTopicTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "create_topic",
-			Description: "Creates a new pubsub topic and returns the topic snapshot after creation.",
+			Description: "Purpose: create one new pubsub topic. Inputs: topic string. Output: topic snapshot after creation. Use when the request explicitly asks to create a topic. Do not use for inspection, deletion, or broadcasting.",
 			Parameters:  toolParams,
 		},
 	}
@@ -269,11 +269,11 @@ func RemoveUserTool() api.Tool {
 	properties := api.NewToolPropertiesMap()
 	properties.Set("portaddress", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Client ID or port address of the user that should be disconnected.",
+		Description: "Client ID or port address of the user to disconnect.",
 	})
 	properties.Set("reason", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Reason message that will be sent to the user before closing the connection.",
+		Description: "Reason message to send before disconnecting the user.",
 	})
 
 	toolParams := api.ToolFunctionParameters{
@@ -286,7 +286,7 @@ func RemoveUserTool() api.Tool {
 		Type: "function",
 		Function: api.ToolFunction{
 			Name:        "remove_user",
-			Description: "Disconnects a subscriber by client ID or port address and returns whether the removal request succeeded.",
+			Description: "Purpose: disconnect one user from the pubsub layer. Inputs: portaddress string, reason string. Output: removal result from the pubsub layer. Use when the request explicitly asks to remove a client. Do not use for unsubscribing by topic or simple inspection.",
 			Parameters:  toolParams,
 		},
 	}

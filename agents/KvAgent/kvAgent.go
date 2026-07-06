@@ -3,7 +3,6 @@ package kvagent
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -15,175 +14,93 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, namespace *store.NameSpace, client *api.Client) {
+const kvSystemPrompt = `You are the RoxKV key-value worker.
+You are not a conversational assistant.
+Use only the provided key-value tools to execute requests against the in-memory store.
+Return raw tool results only.
+Do not explain, summarize, speculate, or invent database contents.
+If no available tool can satisfy the request, return a structured error.`
 
+func KvAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, namespace *store.NameSpace, client *api.Client) string {
 	ctx := context.Background()
-	stream := false
+	session := agents.GetSession("kvagent", kvSystemPrompt, user)
+	tools := []api.Tool{GetKeyTool(), SetKeyTool(), KeysTool(), DeleteKeyTool(), SaveTool(), LoadTool()}
 
-	Message := []api.Message{
-		{
-			Role: "system",
-			Content: `You are an AI controller for an in-memory key-value database.
-		Use tools whenever database access is required.
-		Never fabricate database contents unless required.
-		Answer normally if no tool is needed.`,
-		},
-		{
-			Role:    "user",
-			Content: query,
-		},
-	}
-	// User will send a query
-	req := &api.ChatRequest{
-		Model:    agents.AGENT_USED,
-		Messages: Message,
-		Tools:    []api.Tool{GetKeyTool(), SetKeyTool(), KeysTool(), DeleteKeyTool(), SaveTool(), LoadTool()},
-		Stream:   &stream,
-		Options:  KvInference,
-	}
-
-	var toolCallsToExecute []api.ToolCall
-	var assistantTextResponse string
-
-	// LLM asks for tool execution
-	cerr := client.Chat(ctx, req, func(resp api.ChatResponse) error {
-		if len(resp.Message.ToolCalls) > 0 {
-			toolCallsToExecute = resp.Message.ToolCalls
-		}
-		if resp.Message.Content != "" {
-			assistantTextResponse = resp.Message.Content
-		}
-		return nil
-	})
-
+	toolCallsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, tools, KvInference)
 	if cerr != nil {
-		log.Fatalf("First Ollama API call failed: %v", cerr)
+		log.Fatalf("KV worker API call failed: %v", cerr)
 	}
 
-	if len(toolCallsToExecute) > 0 {
-		// Executes the tools
-		fmt.Printf("Model requested %d tool call(s).\n", len(toolCallsToExecute))
-		Message = append(Message, api.Message{
-			Role:      "assistant",
-			ToolCalls: toolCallsToExecute,
-		})
+	if len(toolCallsToExecute) == 0 {
+		if strings.TrimSpace(assistantTextResponse) == "" {
+			return agents.StructuredError("no_suitable_tool", "The key-value worker could not match the request to an available key-value tool.")
+		}
+		return agents.StructuredError("no_suitable_tool", strings.TrimSpace(assistantTextResponse))
+	}
 
-		var finalResponse []any 
+	var rawResults []string
+	var results []agents.ToolResult
+	for _, tool := range toolCallsToExecute {
+		argsByte, _ := json.Marshal(tool.Function.Arguments)
+		var toolResult any
 
-		for _, tool := range toolCallsToExecute {
+		switch tool.Function.Name {
+		case "get":
+			var args struct {
+				Key string `json:"key"`
+			}
+			_ = json.Unmarshal(argsByte, &args)
+			result := store.GetKv(stre, strings.TrimSpace(args.Key))
+			toolResult = result.Val
+		case "set":
+			var args struct {
+				Key   string `json:"key"`
+				Value string `json:"value"`
+			}
+			_ = json.Unmarshal(argsByte, &args)
 
-			argsByte, _ := json.Marshal(tool.Function.Arguments)
-
-			switch tool.Function.Name {
-			case "get":
-				var args struct {
-					Key string
-				}
-				json.Unmarshal(argsByte, &args)
-
-				// Invoke native stock code
-				result := store.GetKv(stre, strings.TrimSpace(args.Key))
-				fmt.Printf("Executed get tool for: %s -> %v\n", args.Key, result)
-				values := fmt.Sprintf("%v", result.Val)
-				// Append tool result message
-				// Message = append(Message, api.Message{
-				// 	Role:    "tool",
-				// 	Content: values,
-				// })
-				finalResponse = append(finalResponse, values)
-
-			case "set":
-				var args struct {
-					Key   string
-					Value string
-				}
-				json.Unmarshal(argsByte, &args)
-
-				meta := store.Metadata{
-					TTL:           time.Time{},
-					UpdatedAt:     time.Now(),
-					LastAcessedBy: user,
-					Size:          int64(len(args.Value)),
-				}
-				item := store.Item{
-					Key:  strings.TrimSpace(args.Key),
-					Val:  strings.TrimSpace(args.Value),
-					Meta: meta,
-				}
-
-				store.TTLMetricsContainer.PermanentKeys += 1
-
-				result := store.SetKv(stre, namespace, &item)
-
-				values := fmt.Sprintf("%v", result)
-				finalResponse = append(finalResponse, values)
-				// Message = append(Message, api.Message{
-				// 	Role:    "tool",
-				// 	Content: values,
-				// })
-
-			case "del":
-				var args struct {
-					Key string
-				}
-				json.Unmarshal(argsByte, &args)
-
-				result := store.DelKv(stre, strings.TrimSpace(args.Key))
-
-				values := fmt.Sprintf("%v", result)
-
-				// Message = append(Message, api.Message{
-				// 	Role:    "tool",
-				// 	Content: values,
-				// })
-				finalResponse = append(finalResponse, values)
-
-			case "keys":
-				result := store.KeyKv(stre)
-				values := fmt.Sprintf("%v", result)
-				finalResponse = append(finalResponse, values)
-
-				// Message = append(Message, api.Message{
-				// 	Role:    "tool",
-				// 	Content: values,
-				// })
-
-			case "save":
-				values := commands.SaveCommand(stre)
-				finalResponse = append(finalResponse, values)
-
-				// Message = append(Message, api.Message{
-				// 	Role:    "tool",
-				// 	Content: values,
-				// })
-			case "load":
-				total := commands.LoaderCommand(stre, namespace)
-
-				finalResponse = append(finalResponse, total)
-
-				// Message = append(Message, api.Message{
-				// 	Role:    "tool",
-				// 	Content: strconv.Itoa(total),
-				// })
-			default:
-				// Message = append(Message, api.Message{
-				// 	Role:    "tool",
-				// 	Content: "No Tools found",
-				// })
-				continue
+			meta := store.Metadata{
+				TTL:           time.Time{},
+				UpdatedAt:     time.Now(),
+				LastAcessedBy: user,
+				Size:          int64(len(args.Value)),
+			}
+			item := store.Item{
+				Key:  strings.TrimSpace(args.Key),
+				Val:  strings.TrimSpace(args.Value),
+				Meta: meta,
 			}
 
+			store.TTLMetricsContainer.PermanentKeys += 1
+			toolResult = store.SetKv(stre, namespace, &item)
+		case "del":
+			var args struct {
+				Key string `json:"key"`
+			}
+			_ = json.Unmarshal(argsByte, &args)
+			toolResult = store.DelKv(stre, strings.TrimSpace(args.Key))
+		case "keys":
+			toolResult = store.KeyKv(stre)
+		case "save":
+			toolResult = commands.SaveCommand(stre)
+		case "load":
+			toolResult = commands.LoaderCommand(stre, namespace)
+		default:
+			toolResult = map[string]any{
+				"status":  "error",
+				"error":   "unknown_tool",
+				"message": "The key-value worker received an unsupported tool call.",
+			}
 		}
-		
-		value := fmt.Sprintf("%v",finalResponse)
 
-		user.Conn.Write([]byte("\nroxai> " + value + "\n"))
-
-		return
-
-	} else if assistantTextResponse != "" {
-		// fmt.Fprintf(user.Conn, "%s\n", assistantTextResponse)
-		user.Conn.Write([]byte("\nroxai> " + assistantTextResponse + "\n"))
-		return
+		rawBytes, _ := json.Marshal(toolResult)
+		rawResults = append(rawResults, string(rawBytes))
+		results = append(results, agents.ToolResult{
+			Tool:   tool.Function.Name,
+			Output: toolResult,
+		})
 	}
+
+	session.AppendToolResults(rawResults...)
+	return agents.StructuredSuccess(results)
 }
