@@ -126,6 +126,7 @@ func Server() {
 	}
 	defer listner.Close()
 	utils.ServerStarted = time.Now()
+	WebServer()
 
 	go worker.SnapshotWorker(ctx, store, &mutex, utils.TotalConnecntions)
 	fmt.Println("Listening at localhost:6969")

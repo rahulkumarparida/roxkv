@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
@@ -46,6 +47,8 @@ func (s *AgentSession) Run(ctx context.Context, client *api.Client, model, query
 		Content: query,
 	})
 
+	logger.InfoLog("User queried: "+ query)
+
 	req := &api.ChatRequest{
 		Model:    model,
 		Messages: append([]api.Message(nil), s.messages...),
@@ -59,6 +62,8 @@ func (s *AgentSession) Run(ctx context.Context, client *api.Client, model, query
 	var toolCalls []api.ToolCall
 	var assistantText string
 	fmt.Println("Requeted to LLM:", req)
+
+	
 	err := client.Chat(ctx, req, func(resp api.ChatResponse) error {
 		if len(resp.Message.ToolCalls) > 0 {
 			toolCalls = resp.Message.ToolCalls
@@ -79,14 +84,15 @@ func (s *AgentSession) Run(ctx context.Context, client *api.Client, model, query
 		})
 		return toolCalls, assistantText, nil
 	}
-
+	
 	if assistantText != "" {
 		s.messages = append(s.messages, api.Message{
 			Role:    "assistant",
 			Content: assistantText,
 		})
 	}
-
+	logger.InfoLog("Assistant response: "+ assistantText)	
+	
 	return nil, assistantText, nil
 }
 

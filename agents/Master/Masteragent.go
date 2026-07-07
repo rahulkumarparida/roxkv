@@ -53,7 +53,6 @@ type storageClientSummary struct {
 	ConnectedAt  string `json:"connected_at"`
 	Interactions int    `json:"interactions"`
 }
-
 type storageKeyMetadataSummary struct {
 	Key            string                `json:"key"`
 	TTL            string                `json:"ttl"`
@@ -99,7 +98,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, n
 	// and expose only the relevant subset to the LLM.
 	tools := router.RouteTools(query, registry.AllMetadata(), router.DefaultMaxTools)
 
-	fmt.Println("Sending it to the session runner-->")
+	fmt.Println("Sending it to the session runner with total ", len(tools), " tools-->")
 	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, tools, MasterInference)
 	fmt.Println("Tools To exectute: ", len(toolsToExecute))
 

@@ -12,8 +12,8 @@ import (
 )
 
 type KeyNSize struct {
-	Key  string
-	Size int64
+	Key  string `json:"key"`
+	Size int64	`json:"size"`
 }
 
 type SnapshotInfo struct {

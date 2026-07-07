@@ -10,19 +10,19 @@ import (
 )
 
 type ClientSnapshot struct {
-	ID           string
-	Role         string
-	LastUsed     time.Time
-	ConnectedAt  time.Time
-	Interactions int
+	ID           string 	`json:"id"`
+	Role         string		`json:"role"`
+	LastUsed     time.Time	`json:"lastInteraction"`
+	ConnectedAt  time.Time	`json:"connectedAt"`
+	Interactions int		`json:"totalInteractions"`
 }
 
 type TopicSnapshot struct {
-	Subscribers   []ClientSnapshot
-	Publishers    []ClientSnapshot
-	Topic         string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	Subscribers   []ClientSnapshot	`json:"subscribers"`
+	Publishers    []ClientSnapshot	`json:"publishers"`
+	Topic         string	`json:"topic"`
+	CreatedAt     time.Time	`json:"createdAt"`
+	UpdatedAt     time.Time	`json:"updatedAt"`
 	LastPublisher *ClientSnapshot
 	PublishCount  int
 	History       []pubsub.TopicHistory
