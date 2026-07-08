@@ -1,16 +1,19 @@
 package metrics
 
 import (
+	"fmt"
 	"os"
 	"os/user"
 	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/shirou/gopsutil/v4/net"
 )
 
 func GetComputerUsage() utils.MonitorComputeStat {
@@ -127,9 +130,8 @@ type RuntimeStats struct {
 	AllocatedMemMB   uint64 `json:"allocatedMemMB"`
 	TotalAllocatedMB uint64 `json:"totalAllocatedMB"`
 	SystemMemMB      uint64 `json:"systemMemMB"`
-	HeapAllocMB      uint64 `json:"heapAllocMB"`
-	GCCycles         uint32 `json:"gcCycles"`
 	ConnectedUsers   int 	`json:"connectedclient"`
+	ServerUptime     float64 `json:"serverUptime"`
 }
 
 func GetRuntimeStats() RuntimeStats {
@@ -141,10 +143,12 @@ func GetRuntimeStats() RuntimeStats {
 	goroutines := strconv.Itoa(runtime.NumGoroutine())
 	user , err := os.Hostname()
 	totalClients := GetConnectedClients()
+	Uptime := GetServerUptime()
 
 	if err != nil {
 		user = "N/A"
 	}
+
 
 	// 2. Gather memory statistics
 	var ms runtime.MemStats
@@ -164,8 +168,66 @@ func GetRuntimeStats() RuntimeStats {
 		AllocatedMemMB:   ms.Alloc / MB,
 		TotalAllocatedMB: ms.TotalAlloc / MB,
 		SystemMemMB:      ms.Sys / MB,
-		HeapAllocMB:      ms.HeapAlloc / MB,
-		GCCycles:         ms.NumGC,
 		ConnectedUsers: len(totalClients),
+		ServerUptime:     Uptime,
 	}
+}
+
+
+type NetworkStat struct{
+	DownloadSpeed  float64 `json:"downloadspeed"` 
+	UploadSpeed	float64	`json:"uploadspeed"`
+	Name string
+}
+
+func NetworkStatistics(netStats chan<- NetworkStat) {
+	prevStats , err := net.IOCounters(true) 
+
+	if err != nil {
+		fmt.Printf("Error getting initial stats: %v\n", err)
+		return 
+	}
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C{
+		currentStats ,err := net.IOCounters(true)
+		if err != nil {
+			fmt.Printf("Error getting stats: %v\n", err)
+			continue
+		}
+
+		for i := range currentStats {
+			prev := getInterfaceStats(prevStats, currentStats[i].Name)
+			current := currentStats[i]
+
+			// Calculate differences and convert bytes to bits (* 8)
+			diffRx := current.BytesRecv - prev.BytesRecv
+			diffTx := current.BytesSent - prev.BytesSent
+
+			rxSpeedKbps := float64(diffRx*8) / 1024 
+			txSpeedKbps := float64(diffTx*8) / 1024
+
+			netStats <- NetworkStat{
+			DownloadSpeed : rxSpeedKbps,
+			UploadSpeed : txSpeedKbps,
+			Name : current.Name,
+			}
+		
+			fmt.Printf("[%s] Down: %.2f Kbps | Up: %.2f Kbps\n", current.Name, rxSpeedKbps, txSpeedKbps)
+		}
+
+		prevStats = currentStats
+
+	}
+
+}
+
+func getInterfaceStats(stats []net.IOCountersStat, name string) net.IOCountersStat {
+	for _, stat := range stats {
+		if stat.Name == name {
+			return stat
+		}
+	}
+	return net.IOCountersStat{}
 }

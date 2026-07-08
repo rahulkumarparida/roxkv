@@ -198,7 +198,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, n
 				case "get_runtime_stats":
 					response = marshalMonitorResult(metrics.GetRuntimeStats())
 				case "get_server_uptime":
-					response = metrics.GetServerUptime().String()
+					response = fmt.Sprintf("%.2f", metrics.GetServerUptime())
 				case "get_connected_clients":
 					response = marshalMonitorResult(metrics.GetConnectedClients())
 				case "get_command_count":
@@ -292,6 +292,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, n
 			user.Conn.Write([]byte("\nroxai> " + finalText + "\n"))
 			return
 		}
+		
 
 		user.Conn.Write([]byte("\nroxai> " + strings.Join(specialistReplies, "\n\n") + "\n"))
 		return

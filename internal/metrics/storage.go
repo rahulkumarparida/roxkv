@@ -300,6 +300,21 @@ func GetSnapshotSize() int64 {
 	return totalSize
 }
 
+
+func NextSnapshotTime() float64 {	
+
+	data := GetLatestSnapshot()
+	
+
+	timeleft := data.ModifiedAt.Sub(time.Now())
+	timedur := (10*time.Minute) - timeleft
+	if timeleft < 0 {
+		return 0
+	}
+
+	return timedur.Seconds()
+}
+
 func GetPersistenceHealth() PersistenceHealth {
 	dbFolder := utils.DbFolder()
 	snapshotFolder := utils.SnapshotFolder()

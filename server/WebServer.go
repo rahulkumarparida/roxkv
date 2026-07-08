@@ -39,96 +39,70 @@ func WebServer(store *store.MemoryAlloc) {
 func SseHandler(w http.ResponseWriter, r *http.Request) {
 
 	params := mux.Vars(r)
-
 	toolrequiredName := params["name"]
 
-	hijacker, ok := w.(http.Hijacker)
+	// SSE Headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 		return
 	}
 
-	tcpConn, rw, herr := hijacker.Hijack()
-	if herr != nil {
-		http.Error(w, herr.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	rw.WriteString("HTTP/1.1 200 OK\r\n")
-	rw.WriteString("Content-Type: text/event-stream\r\n")
-	rw.WriteString("Cache-Control: no-cache\r\n")
-	rw.WriteString("Connection: keep-alive\r\n")
-	rw.WriteString("Access-Control-Allow-Origin: *\r\n")
-	rw.WriteString("\r\n")
-	rw.Flush()
-
-	client := utils.CreateClient(tcpConn, "user")
+	// Send headers immediately
+	flusher.Flush()
 
 	clientGone := r.Context().Done()
 
-	// rc := http.NewResponseController(w)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 
 	for {
 		select {
+
 		case <-clientGone:
-			tcpConn.Close()
-			fmt.Println("Client Dsiconnected: ", client)
+			fmt.Println("Client disconnected")
 			return
+
 		case <-t.C:
 
-			data := HandleResponseData(toolrequiredName, client, StoreHelper)
+			// Remove the client argument later after your Pub/Sub refactor.
+			data := HandleResponseData(toolrequiredName, nil, StoreHelper)
 
-			stringifiedData, jerr := json.Marshal(data)
-
-			if jerr != nil {
-				tcpConn.Close()
+			stringifiedData, err := json.Marshal(data)
+			if err != nil {
+				fmt.Println("JSON Error:", err)
 				return
 			}
 
-			rw.WriteString("data: ")
-			rw.Write(stringifiedData)
-			rw.WriteString("\n\n")
-
-			if err := rw.Flush(); err != nil {
-				tcpConn.Close()
+			_, err = fmt.Fprintf(w, "data: %s\n\n", stringifiedData)
+			if err != nil {
+				fmt.Println("Write Error:", err)
 				return
 			}
 
+			flusher.Flush()
 		}
 	}
-
 }
 
 func HandleResponseData(name string, client *utils.NewClient, store *store.MemoryAlloc) any {
 
 	switch name {
-	case "cpu":
-		data := GetCPUData()
+	case "monitor":
+		data := MonitorStatsData()
 		return data
-	case "ram":
-		data := GetRAMData()
+	case "storage":
+		data := SnapshotData()
 		return data
-	case "uptime":
-		data := GetServreUptimeData()
+	case "database":
+		data := DataBaseData(client)
 		return data
-	case "machineinfo":
-		data := GetComputerInformation()
-		return data
-	case "disk":
-		data := GetDiskData()
-		return data
-	case "runtime":
-		data := GetRuntimeData()
-		return data
-	case "pubsubtopics":
-		data := GetTopicList(client)
-		return data
-	case "dbdata":
-		data := DataBaseData()
-		return data
-	case "livehistory":
+	case "activity":
 		data := LiveHistoryData()
 		return data
 	default:
@@ -139,41 +113,12 @@ func HandleResponseData(name string, client *utils.NewClient, store *store.Memor
 }
 
 // Machine Health
-func GetServreUptimeData() time.Duration {
-	data := metrics.GetServerUptime()
-	return data
-}
-
-func GetCPUData() string {
-	data := metrics.GetCPUUsage()
-	return data
-}
-
-func GetRAMData() metrics.RAM {
-	data := metrics.GetRAMUsage()
-	return data
-}
-
-func GetComputerInformation() utils.MonitorComputeStat {
-	data := metrics.GetComputerUsage()
-	return data
-}
-
-func GetDiskData() metrics.DISK {
-	data := metrics.GetDiskUsage("/") // Figure the path situation
-	return data
-}
-
-func GetRuntimeData() metrics.RuntimeStats {
+func GetComputerInformation() metrics.RuntimeStats {
 	data := metrics.GetRuntimeStats()
 	return data
 }
 
-// Snapshot Info
-func SnapShotData() metrics.PersistenceHealth {
-	data := metrics.GetPersistenceHealth()
-	return data
-}
+
 
 type DataBaseInfo struct {
 	SavedDataSize     int64            `json:"savedDataSize"`
@@ -181,9 +126,40 @@ type DataBaseInfo struct {
 	TotalKeysSize     int64            `json:"totalKeysSize"`
 	LastSnapShotTime  time.Time        `json:"lastSnapShotTime"`
 	TtlMetrics        *store.TTLMetrics `json:"ttlMetrics"`
+	PubSubTopics      []TopicList         `json:"pubsubTopics"`
 }
 
-func DataBaseData() DataBaseInfo {
+type MonitorStats struct{
+	CpuUsage string `json:"cpuusage"`
+	RamUsage metrics.RAM `json:"ramusage"`
+	DiskUsage metrics.DISK `json:"diskusage"`
+	NetworkUsage metrics.NetworkStat `json:"networkstats"`
+	MachineInfo metrics.RuntimeStats `json:"machineinfo"`
+}
+
+// Monitor 
+func MonitorStatsData() MonitorStats{
+	netStats := make(chan metrics.NetworkStat, 0)
+	machineinfo := GetComputerInformation()
+	cpudata := metrics.GetCPUUsage()
+	ramdata := metrics.GetRAMUsage()
+	diskdata := metrics.GetDiskUsage("/")
+	go metrics.NetworkStatistics(netStats)
+
+	networkData := <-netStats
+
+	return MonitorStats{
+		CpuUsage: cpudata,
+		RamUsage: ramdata,
+		DiskUsage: diskdata,
+		NetworkUsage: networkData,
+		MachineInfo:machineinfo,
+	}
+
+}
+
+// database
+func DataBaseData(client *utils.NewClient) DataBaseInfo {
 	dbFolder := utils.DbFolder()
 	snapshotFolder := utils.SnapshotFolder()
 
@@ -202,7 +178,7 @@ func DataBaseData() DataBaseInfo {
 	ttlMetrics := metrics.GetTTLMetrics()
 
 	allKeys := metrics.LiveItems(StoreHelper)
-
+	topics := GetTopicList(client)
 	var TotalKeysSize int64
 	for _, key := range allKeys {
 		TotalKeysSize += key.Meta.Size
@@ -214,6 +190,7 @@ func DataBaseData() DataBaseInfo {
 		TotalKeysSize:     TotalKeysSize,
 		LastSnapShotTime:  latestSnapShotTime,
 		TtlMetrics:        &ttlMetrics,
+		PubSubTopics:      []TopicList{topics},
 	}
 
 }
@@ -233,6 +210,39 @@ func GetTopicList(client *utils.NewClient) TopicList {
 
 }
 
+
+type SnapshotInfo struct {
+	TotalSnapShotSize int64     `json:"totalSnapShotSize"`
+	TotalSnapshots int       `json:"totalSnapshots"`
+	LatestSnapshot time.Time `json:"latestSnapshot"`
+	LastCreated    time.Time `json:"lastCreated"`
+	NextSnap       float64 `json:"nextSnap"`
+}
+
+//Snapshot Info
+func SnapshotData() SnapshotInfo{
+
+	snapshotFolder := utils.SnapshotFolder()
+
+	snapinfo, err := os.Stat(snapshotFolder)
+		if err != nil {
+		fmt.Println("Directories not found")
+		return SnapshotInfo{}
+	}
+	snapshotSize := snapinfo.Size()
+	totalSnaps := metrics.GetSnapshotCount()
+	lastCreated := metrics.GetLatestSnapshot().ModifiedAt
+	latestsnap := metrics.GetLatestSnapshot()
+	NextSnap := metrics.NextSnapshotTime()
+
+	return SnapshotInfo{
+		TotalSnapShotSize: snapshotSize,
+		TotalSnapshots: totalSnaps,
+		LatestSnapshot: latestsnap.ModifiedAt,
+		LastCreated: lastCreated,
+		NextSnap: NextSnap,
+	}
+}
 
 
 // History Info

@@ -67,6 +67,7 @@ type MonitorComputeStat struct {
 	FreeRam         uint64  `json:"freeRam"`
 	UsedRamPercent  float64 `json:"usedRamPercent"`
 	TotalGoRoutines int     `json:"totalGoRoutines"`
+	ServerUptime	time.Duration `json:"serverUptime"`
 }
 
 // Constant Folders section

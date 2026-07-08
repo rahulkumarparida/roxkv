@@ -8,12 +8,12 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-func GetServerUptime() time.Duration {
+func GetServerUptime() float64 {
 	// time.start at a begning call
 	// to the time asked query
 	duration := time.Since(utils.ServerStarted)
 
-	return duration
+	return duration.Seconds()
 }
 
 func GetConnectedClients() []utils.ClientMetaData {

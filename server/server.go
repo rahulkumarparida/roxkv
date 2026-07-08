@@ -5,12 +5,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/ollama/ollama/api"
 	"github.com/rahulkumarparida/roxkv/internal/commands"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
@@ -114,6 +116,12 @@ func DeadOrAliveConnections(ctx context.Context, client *utils.NewClient) {
 }
 
 func Server() {
+	agent, err := api.ClientFromEnvironment()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	store, namespace := store.StoreInMemory()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -129,8 +137,9 @@ func Server() {
 	
 	go worker.SnapshotWorker(ctx, store, &mutex, utils.TotalConnecntions)
 	fmt.Println("Listening CLI Connection at localhost:6969")
-	go ChatServer(store, namespace)
+	go ChatServer(store, namespace,agent)
 	go WebServer(store)
+	go WebChatServer(store,namespace,agent)
 
 	for {
 
