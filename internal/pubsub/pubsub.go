@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
@@ -11,98 +10,89 @@ import (
 )
 
 // Single Channel and will contain many to many relationship with Subs and Pubs
-type TopicHistory struct{
-	Message string
-	Size int64
-	CreatedAt time.Time
+type TopicHistory struct {
+	Message   string    `json:"message"`
+	Size      int64     `json:"size"`
+	CreatedAt time.Time `json:"createdAt"`
 }
-
 
 type SubrChannel struct {
-	Subscribers []*utils.NewClient
-	Publisher []*utils.NewClient
-	Topic             string
-	SubscribeChan chan string
-	Wg sync.WaitGroup
-	Mu sync.RWMutex
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	LastPublisher *utils.NewClient
-	PublishCount int
-	History []TopicHistory
-	TotalSize int64
+	Subscribers   []*utils.NewClient `json:"subscribers"`
+	Publisher     []*utils.NewClient `json:"publisher"`
+	Topic         string             `json:"topic"`
+	SubscribeChan chan string        `json:"-"`
+	Wg            sync.WaitGroup     `json:"-"`
+	Mu            sync.RWMutex       `json:"-"`
+	CreatedAt     time.Time          `json:"createdAt"`
+	UpdatedAt     time.Time          `json:"updatedAt"`
+	LastPublisher *utils.NewClient   `json:"lastPublisher"`
+	PublishCount  int                `json:"publishCount"`
+	History       []TopicHistory     `json:"history"`
+	TotalSize     int64              `json:"totalSize"`
 }
 
-
-
 // Collects all the channel for the broker to decide the message to send to, along with all the names
-type AllChannels struct{
-	Channels []*SubrChannel
-	ChannelNames []string
-	Mu sync.RWMutex
+type AllChannels struct {
+	Channels     []*SubrChannel `json:"channels"`
+	ChannelNames []string       `json:"channelNames"`
+	Mu           sync.RWMutex   `json:"-"`
 }
 
 var Helper AllChannels
 
-
-func CreateTopic(client *utils.NewClient,topic string) *SubrChannel{
+func CreateTopic(client *utils.NewClient, topic string) *SubrChannel {
 	publisher := []*utils.NewClient{client}
 
-	channel :=  &SubrChannel{
-		Subscribers: []*utils.NewClient{},
-		Publisher: publisher,
-		Topic: topic,
-		SubscribeChan: make(chan string,100),
-		Wg: sync.WaitGroup{},
-		Mu: sync.RWMutex{},
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+	channel := &SubrChannel{
+		Subscribers:   []*utils.NewClient{},
+		Publisher:     publisher,
+		Topic:         topic,
+		SubscribeChan: make(chan string, 100),
+		Wg:            sync.WaitGroup{},
+		Mu:            sync.RWMutex{},
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 		LastPublisher: nil,
-		History: []TopicHistory{},
-		PublishCount: 1,
-		TotalSize: 0,
+		History:       []TopicHistory{},
+		PublishCount:  1,
+		TotalSize:     0,
 	}
-
 
 	return channel
 }
 
-func FindChannel(collection *AllChannels,topic string) (*SubrChannel,bool){
+func FindChannel(collection *AllChannels, topic string) (*SubrChannel, bool) {
 
-
-	for _, channel := range  collection.Channels{
-		if channel.Topic==topic  {
-			return channel , true
+	for _, channel := range collection.Channels {
+		if channel.Topic == topic {
+			return channel, true
 		}
-	}	
+	}
 
-	return nil,false
+	return nil, false
 
-} 
+}
 
-
-
-func GetChannel(client *utils.NewClient,topic string) *SubrChannel{
+func GetChannel(client *utils.NewClient, topic string) *SubrChannel {
 	Helper.Mu.Lock()
-	defer Helper.Mu.Unlock()	
+	defer Helper.Mu.Unlock()
 
-	channel, exist := FindChannel(&Helper,topic)
+	channel, exist := FindChannel(&Helper, topic)
 
 	if exist {
-		
+
 		return channel
 	}
-	
-	channel = CreateTopic(client,topic)
+
+	channel = CreateTopic(client, topic)
 	Helper.ChannelNames = append(Helper.ChannelNames, channel.Topic)
 	Helper.Channels = append(Helper.Channels, channel)
-		
+
 	return channel
 }
 
-
-func HandleSubscribers(client *utils.NewClient,topic string) bool{
-	channel := GetChannel(client,topic)
+func HandleSubscribers(client *utils.NewClient, topic string) bool {
+	channel := GetChannel(client, topic)
 
 	channel.Mu.Lock()
 	channel.UpdatedAt = time.Now()
@@ -112,21 +102,21 @@ func HandleSubscribers(client *utils.NewClient,topic string) bool{
 	return true
 }
 
-func DeliverMessage(sub *utils.NewClient, msg string,wg *sync.WaitGroup){
-		defer wg.Done()
-		
-		sub.Conn.Write([]byte("roxkv> "+msg+"\n"))
+func DeliverMessage(sub *utils.NewClient, msg string, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-		sub.Mu.Lock()
-		sub.LastUsed = time.Now()
-		sub.Mu.Unlock()
+	sub.Conn.Write([]byte("roxkv> " + msg + "\n"))
+
+	sub.Mu.Lock()
+	sub.LastUsed = time.Now()
+	sub.Mu.Unlock()
 }
 
-func Broker(client *utils.NewClient,topic string , msg string) {
+func Broker(client *utils.NewClient, topic string, msg string) {
 	Helper.Mu.Lock()
 	defer Helper.Mu.Unlock()
 
-	channel , exist := FindChannel(&Helper,topic)
+	channel, exist := FindChannel(&Helper, topic)
 
 	if !exist && channel == nil {
 		client.Conn.Write([]byte("Channel on the topic does not exist yet\n"))
@@ -134,62 +124,56 @@ func Broker(client *utils.NewClient,topic string , msg string) {
 	}
 
 	historymsg := TopicHistory{
-		Message: msg,
-		Size: int64(len(msg)),
+		Message:   msg,
+		Size:      int64(len(msg)),
 		CreatedAt: time.Now(),
 	}
-
 
 	channel.UpdatedAt = time.Now()
 	channel.LastPublisher = client
 	channel.PublishCount += 1
-	channel.TotalSize += int64(len(msg)) 	
+	channel.TotalSize += int64(len(msg))
 	channel.History = append(channel.History, historymsg)
-	
-
 
 	subs := make([]*utils.NewClient, len(channel.Subscribers))
-	pubs := make([]*utils.NewClient,len(channel.Publisher))
-	copy(subs,channel.Subscribers)
-	copy(pubs,channel.Publisher)
+	pubs := make([]*utils.NewClient, len(channel.Publisher))
+	copy(subs, channel.Subscribers)
+	copy(pubs, channel.Publisher)
 
 	var IsPublisher bool = false
 
 	for _, pub := range pubs {
-		if client == pub{
-			IsPublisher=true
+		if client == pub {
+			IsPublisher = true
 		}
 	}
-	
+
 	if len(pubs) == 0 {
 		channel.Publisher = append(channel.Publisher, client)
-	}	
-	
-	
+	}
+
 	if IsPublisher || client.Role == string(utils.RoleSystem) || client.Role == string(utils.RoleAdmin) {
 		for _, sub := range subs {
-		
-		channel.Wg.Add(1)
-		go DeliverMessage(sub,msg,&channel.Wg)
+
+			channel.Wg.Add(1)
+			go DeliverMessage(sub, msg, &channel.Wg)
 
 		}
 		channel.Wg.Wait()
-		
-	}else{
+
+	} else {
 		client.Conn.Write([]byte("Only Publisher can publish on the channel\n"))
 		return
 
 	}
-	
 
 }
 
-
-func HandleUnsubscribes(client *utils.NewClient, topic string)  {
+func HandleUnsubscribes(client *utils.NewClient, topic string) {
 	Helper.Mu.Lock()
 	defer Helper.Mu.Unlock()
 
-	channel , exist := FindChannel(&Helper,topic)
+	channel, exist := FindChannel(&Helper, topic)
 
 	if !exist && channel == nil {
 		client.Conn.Write([]byte("Channel on the topic does not exist yet\n"))
@@ -197,114 +181,110 @@ func HandleUnsubscribes(client *utils.NewClient, topic string)  {
 	}
 
 	channel.UpdatedAt = time.Now()
-	for idx , sub := range channel.Subscribers {
+	for idx, sub := range channel.Subscribers {
 		if sub == client {
-			channel.Subscribers = slices.Delete(channel.Subscribers,idx,idx+1)	
-			break
-		}
-	}					
-
-	for idx , pub := range channel.Publisher {
-		if pub == client {
-			channel.Publisher = slices.Delete(channel.Publisher,idx,idx+1)	
+			channel.Subscribers = slices.Delete(channel.Subscribers, idx, idx+1)
 			break
 		}
 	}
 
-	client.Conn.Write([]byte("Sucessfully Unsubscribed to "+topic+".\n"))
+	for idx, pub := range channel.Publisher {
+		if pub == client {
+			channel.Publisher = slices.Delete(channel.Publisher, idx, idx+1)
+			break
+		}
+	}
+
+	client.Conn.Write([]byte("Sucessfully Unsubscribed to " + topic + ".\n"))
 }
 
-
-func GetTopics(client *utils.NewClient) []string{
+func GetTopics(client *utils.NewClient) []string {
 	Helper.Mu.Lock()
-	topics := make([]string,len(Helper.ChannelNames))
-	copy(topics,Helper.ChannelNames)
+	topics := make([]string, len(Helper.ChannelNames))
+	copy(topics, Helper.ChannelNames)
 	Helper.Mu.Unlock()
 
-	for idx, topic := range topics {
-		client.Conn.Write([]byte(strconv.Itoa(idx)+". "+topic+"\n"))
-	}
+	// for idx, topic := range topics {
+	// 	client.Conn.Write([]byte(strconv.Itoa(idx)+". "+topic+"\n"))
+	// }
 	return topics
 }
 
-func CloseChannel(client *utils.NewClient,topic string){
+func CloseChannel(client *utils.NewClient, topic string) {
 	Helper.Mu.Lock()
-	topics := make([]string,len(Helper.ChannelNames))
-	copy(topics,Helper.ChannelNames)
-
-	
+	topics := make([]string, len(Helper.ChannelNames))
+	copy(topics, Helper.ChannelNames)
 
 	for idx, channel := range topics {
 		if channel == topic {
-			Helper.ChannelNames = slices.Delete(Helper.ChannelNames,idx,idx+1)
+			Helper.ChannelNames = slices.Delete(Helper.ChannelNames, idx, idx+1)
 
 			break
 		}
 	}
 
-	topicsChannel := make([]*SubrChannel,len(Helper.Channels))
-	copy(topicsChannel,Helper.Channels)
+	topicsChannel := make([]*SubrChannel, len(Helper.Channels))
+	copy(topicsChannel, Helper.Channels)
 
 	for idx, channel := range topicsChannel {
 		if channel.Topic == topic {
-			Helper.Channels = slices.Delete(Helper.Channels,idx,idx+1)
+			Helper.Channels = slices.Delete(Helper.Channels, idx, idx+1)
 			break
 		}
 	}
-	Helper.Mu.Unlock()	
+	Helper.Mu.Unlock()
 
 	GetTopics(client)
 
 }
 
-
-func PublishToAllTopics(client *utils.NewClient, message string) string{
+func PublishToAllTopics(client *utils.NewClient, message string) string {
 
 	if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
 		return ""
 	}
-	logger.InfoLog(" "+client.Role+" : Broadcasted a message across all topics")
+	logger.InfoLog(" " + client.Role + " : Broadcasted a message across all topics")
 	topics := GetTopics(client)
 
 	for _, topic := range topics {
 
-		Broker(client,topic,message)
-		
+		Broker(client, topic, message)
+
 	}
 
 	return "Published Sucessfully"
 }
 
-func GetClients(client *utils.NewClient,topic *SubrChannel, category string) []*utils.NewClient{
+func GetClients(client *utils.NewClient, topic *SubrChannel, category string) []*utils.NewClient {
 
 	var clients []*utils.NewClient
 
-	switch category{
-			case "sub":
-				clients = append(clients, topic.Subscribers...)
-			case "pub":
-				clients = append(clients, topic.Publisher...)
-			default:
-				return clients
-			}
-		return  clients
+	switch category {
+	case "sub":
+		clients = append(clients, topic.Subscribers...)
+	case "pub":
+		clients = append(clients, topic.Publisher...)
+	default:
+		return clients
+	}
+	return clients
 }
 
-func GetAllMembers(client *utils.NewClient,subOrPub string) []*utils.NewClient{
+func GetAllMembers(client *utils.NewClient, subOrPub string) []*utils.NewClient {
 
 	// if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
 	// 	return []*utils.NewClient{}
 	// }
-	logger.InfoLog(" "+client.Role+" : Invoked all the members of all the topics")
-	
+	logger.InfoLog(" " + client.Role + " : Invoked all the members of all the topics")
+
 	Helper.Mu.Lock()
-	topicsChannel := make([]*SubrChannel,len(Helper.Channels))
-	copy(topicsChannel,Helper.Channels)
+	topicsChannel := make([]*SubrChannel, len(Helper.Channels))
+	copy(topicsChannel, Helper.Channels)
 	Helper.Mu.Unlock()
 	var clients []*utils.NewClient
 	for _, channel := range topicsChannel {
-		clients = GetClients(client,channel,subOrPub)
+		clients = GetClients(client, channel, subOrPub)
 	}
 
-	return  clients
+	return clients
 }

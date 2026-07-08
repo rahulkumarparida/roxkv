@@ -76,7 +76,7 @@ func ReadFromFile(flag string) (string, error){
 	data := string(databytes)
 
 	switch flag {
-	case "--all":
+	case "--all","":
 		return data , nil
 	case "--success":
 		var appendata string

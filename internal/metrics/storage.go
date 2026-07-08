@@ -13,35 +13,35 @@ import (
 
 type KeyNSize struct {
 	Key  string `json:"key"`
-	Size int64	`json:"size"`
+	Size int64  `json:"size"`
 }
 
 type SnapshotInfo struct {
-	Name       string
-	Path       string
-	Size       int64
-	ModifiedAt time.Time
+	Name       string    `json:"name"`
+	Path       string    `json:"path"`
+	Size       int64     `json:"size"`
+	ModifiedAt time.Time `json:"modifiedAt"`
 }
 type PersistenceHealth struct {
-	DbFolderExists       bool
-	SnapshotFolderExists bool
-	SnapshotCount        int
-	TotalSnapshotSize    int64
-	LatestSnapshot       SnapshotInfo
+	DbFolderExists       bool         `json:"dbFolderExists"`
+	SnapshotFolderExists bool         `json:"snapshotFolderExists"`
+	SnapshotCount        int          `json:"snapshotCount"`
+	TotalSnapshotSize    int64        `json:"totalSnapshotSize"`
+	LatestSnapshot       SnapshotInfo `json:"latestSnapshot"`
 }
 
 type KeyMetadata struct {
-	Key            string
-	TTL            time.Time
-	UpdatedAt      time.Time
-	CreatedAt      time.Time
-	LastAcessedBy  *utils.NewClient
-	KeyAccessCount int64
-	Size           int64
-	Namespace      string
+	Key            string           `json:"key"`
+	TTL            time.Time        `json:"ttl"`
+	UpdatedAt      time.Time        `json:"updatedAt"`
+	CreatedAt      time.Time        `json:"createdAt"`
+	LastAcessedBy  *utils.NewClient `json:"lastAcessedBy"`
+	KeyAccessCount int64            `json:"keyAccessCount"`
+	Size           int64            `json:"size"`
+	Namespace      string           `json:"namespace"`
 }
 
-func liveItems(stre *store.MemoryAlloc) []store.Item {
+func LiveItems(stre *store.MemoryAlloc) []store.Item {
 	stre.Mu.RLock()
 	defer stre.Mu.RUnlock()
 
@@ -138,22 +138,22 @@ func toKeyMetadata(item store.Item) KeyMetadata {
 // Key statistcs
 func GetTotalKeys(stre *store.MemoryAlloc, namespace *store.NameSpace) int {
 	_ = namespace
-	return len(liveItems(stre))
+	return len(LiveItems(stre))
 }
 
 func GetLargestKeys(stre *store.MemoryAlloc, namespace *store.NameSpace, topN int) []KeyNSize {
 	_ = namespace
-	return topSizedKeys(liveItems(stre), topN, true)
+	return topSizedKeys(LiveItems(stre), topN, true)
 }
 
 func GetSmallestKeys(stre *store.MemoryAlloc, namespace *store.NameSpace, topN int) []KeyNSize {
 	_ = namespace
-	return topSizedKeys(liveItems(stre), topN, false)
+	return topSizedKeys(LiveItems(stre), topN, false)
 }
 
 func GetAverageValueSize(stre *store.MemoryAlloc, namespace *store.NameSpace) int {
 	_ = namespace
-	items := liveItems(stre)
+	items := LiveItems(stre)
 	if len(items) == 0 {
 		return 0
 	}
@@ -168,7 +168,7 @@ func GetAverageValueSize(stre *store.MemoryAlloc, namespace *store.NameSpace) in
 
 func GetNamespaces(stre *store.MemoryAlloc, namespace *store.NameSpace) []KeyNSize {
 	_ = namespace
-	items := liveItems(stre)
+	items := LiveItems(stre)
 	if len(items) == 0 {
 		return []KeyNSize{}
 	}
@@ -220,7 +220,6 @@ func GetTTLMetrics() store.TTLMetrics {
 	}
 }
 
-
 // Remove
 func GetExpiredKeys(stre *store.MemoryAlloc) []string {
 	stre.Mu.RLock()
@@ -238,9 +237,8 @@ func GetExpiredKeys(stre *store.MemoryAlloc) []string {
 	return expired
 }
 
-
 func GetUpcomingExpirations(stre *store.MemoryAlloc, topN int) []store.TTLInfo {
-	items := liveItems(stre)
+	items := LiveItems(stre)
 	upcoming := make([]store.TTLInfo, 0)
 
 	for _, item := range items {
@@ -265,7 +263,7 @@ func GetUpcomingExpirations(stre *store.MemoryAlloc, topN int) []store.TTLInfo {
 }
 
 func GetKeysWithoutTTL(stre *store.MemoryAlloc) []string {
-	items := liveItems(stre)
+	items := LiveItems(stre)
 	keys := make([]string, 0)
 
 	for _, item := range items {
@@ -319,7 +317,7 @@ func GetPersistenceHealth() PersistenceHealth {
 
 // Metadata
 func GetOldestKey(stre *store.MemoryAlloc) KeyMetadata {
-	items := liveItems(stre)
+	items := LiveItems(stre)
 	if len(items) == 0 {
 		return KeyMetadata{}
 	}
@@ -332,7 +330,7 @@ func GetOldestKey(stre *store.MemoryAlloc) KeyMetadata {
 }
 
 func GetNewestKey(stre *store.MemoryAlloc) KeyMetadata {
-	items := liveItems(stre)
+	items := LiveItems(stre)
 	if len(items) == 0 {
 		return KeyMetadata{}
 	}
@@ -345,7 +343,7 @@ func GetNewestKey(stre *store.MemoryAlloc) KeyMetadata {
 }
 
 func GetMostAccessedKey(stre *store.MemoryAlloc) KeyMetadata {
-	items := liveItems(stre)
+	items := LiveItems(stre)
 	if len(items) == 0 {
 		return KeyMetadata{}
 	}
@@ -358,7 +356,7 @@ func GetMostAccessedKey(stre *store.MemoryAlloc) KeyMetadata {
 }
 
 func GetLeastAccessedKey(stre *store.MemoryAlloc) KeyMetadata {
-	items := liveItems(stre)
+	items := LiveItems(stre)
 	if len(items) == 0 {
 		return KeyMetadata{}
 	}
@@ -371,7 +369,7 @@ func GetLeastAccessedKey(stre *store.MemoryAlloc) KeyMetadata {
 }
 
 func GetRecentlyModifiedKeys(stre *store.MemoryAlloc, topN int) []KeyMetadata {
-	items := liveItems(stre)
+	items := LiveItems(stre)
 	if len(items) == 0 || topN <= 0 {
 		return []KeyMetadata{}
 	}

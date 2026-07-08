@@ -1,16 +1,12 @@
 package commands
 
-
-type functionOccuerence struct{
-	FuncName string
-	Params string
-	Count int
+type functionOccuerence struct {
+	FuncName string `json:"funcName"`
+	Params   string `json:"params"`
+	Count    int    `json:"count"`
 }
 
-var Output string 
-
-
-
+var Output string
 
 var listOfTools []functionOccuerence = []functionOccuerence{
 	{
@@ -28,12 +24,8 @@ var listOfTools []functionOccuerence = []functionOccuerence{
 		"no parameters",
 		0,
 	},
-} 
-
-
-func Iterator(){
-	
-
-
 }
 
+func Iterator() {
+
+}

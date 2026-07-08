@@ -29,8 +29,8 @@ var stopWords = map[string]bool{
 
 // scoredTool pairs a metadata entry with its computed relevance score.
 type scoredTool struct {
-	meta  registry.ToolMetadata
-	score float64
+	meta  registry.ToolMetadata `json:"meta"`
+	score float64               `json:"score"`
 }
 
 // RouteTools scores every registered tool against the user query and

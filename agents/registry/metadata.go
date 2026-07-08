@@ -11,36 +11,36 @@ import (
 // below, then only the highest-scoring subset is exposed to the LLM.
 type ToolMetadata struct {
 	// Name is the unique identifier matching api.ToolFunction.Name.
-	Name string
+	Name string `json:"name"`
 
 	// Tool is the actual api.Tool value passed to the LLM when selected.
-	Tool api.Tool
+	Tool api.Tool `json:"tool"`
 
 	// Category is a logical grouping such as "KV", "Monitoring",
 	// "PubSub", "Storage", or "Persistence".
-	Category string
+	Category string `json:"category"`
 
 	// Description is a concise explanation used only for routing
 	// and maintainability. It is NOT sent to the LLM.
-	Description string
+	Description string `json:"description"`
 
 	// Keywords are primary routing keywords that trigger selection.
-	Keywords []string
+	Keywords []string `json:"keywords"`
 
 	// Synonyms are natural-language alternatives for the tool's action.
-	Synonyms []string
+	Synonyms []string `json:"synonyms"`
 
 	// Examples are representative user request phrases used for
 	// example-phrase matching during routing.
-	Examples []string
+	Examples []string `json:"examples"`
 
 	// Priority is a numeric routing weight. Higher values indicate
 	// stronger confidence when a match occurs.
-	Priority int
+	Priority int `json:"priority"`
 
 	// IsMutation indicates whether the tool changes application state.
 	// Read-only tools should be false.
-	IsMutation bool
+	IsMutation bool `json:"isMutation"`
 }
 
 var (

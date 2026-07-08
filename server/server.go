@@ -126,11 +126,11 @@ func Server() {
 	}
 	defer listner.Close()
 	utils.ServerStarted = time.Now()
-	WebServer()
-
+	
 	go worker.SnapshotWorker(ctx, store, &mutex, utils.TotalConnecntions)
-	fmt.Println("Listening at localhost:6969")
+	fmt.Println("Listening CLI Connection at localhost:6969")
 	go ChatServer(store, namespace)
+	go WebServer(store)
 
 	for {
 

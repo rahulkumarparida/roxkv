@@ -10,23 +10,23 @@ import (
 )
 
 type ClientSnapshot struct {
-	ID           string 	`json:"id"`
-	Role         string		`json:"role"`
-	LastUsed     time.Time	`json:"lastInteraction"`
-	ConnectedAt  time.Time	`json:"connectedAt"`
-	Interactions int		`json:"totalInteractions"`
+	ID           string    `json:"id"`
+	Role         string    `json:"role"`
+	LastUsed     time.Time `json:"lastInteraction"`
+	ConnectedAt  time.Time `json:"connectedAt"`
+	Interactions int       `json:"totalInteractions"`
 }
 
 type TopicSnapshot struct {
-	Subscribers   []ClientSnapshot	`json:"subscribers"`
-	Publishers    []ClientSnapshot	`json:"publishers"`
-	Topic         string	`json:"topic"`
-	CreatedAt     time.Time	`json:"createdAt"`
-	UpdatedAt     time.Time	`json:"updatedAt"`
-	LastPublisher *ClientSnapshot
-	PublishCount  int
-	History       []pubsub.TopicHistory
-	TotalSize     int64
+	Subscribers   []ClientSnapshot      `json:"subscribers"`
+	Publishers    []ClientSnapshot      `json:"publishers"`
+	Topic         string                `json:"topic"`
+	CreatedAt     time.Time             `json:"createdAt"`
+	UpdatedAt     time.Time             `json:"updatedAt"`
+	LastPublisher *ClientSnapshot       `json:"lastPublisher"`
+	PublishCount  int                   `json:"publishCount"`
+	History       []pubsub.TopicHistory `json:"history"`
+	TotalSize     int64                 `json:"totalSize"`
 }
 
 func snapshotClient(client *utils.NewClient) ClientSnapshot {

@@ -69,7 +69,7 @@ func ChatServer(stre *store.MemoryAlloc, namespace *store.NameSpace) {
 		return
 	}
 	defer listner.Close()
-	fmt.Println("Listening at localhost:6970")
+	fmt.Println("Listening RoxAI Connections at localhost:6970")
 
 	for {
 		conn, err := listner.Accept()

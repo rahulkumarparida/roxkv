@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"os"
 	"os/user"
 	"runtime"
 	"strconv"
@@ -66,9 +67,9 @@ func GetCPUUsage() string {
 }
 
 type RAM struct {
-	TotalRam      uint64
-	FreeRam       uint64
-	UsedPercentge float64
+	TotalRam      uint64  `json:"totalRam"`
+	FreeRam       uint64  `json:"freeRam"`
+	UsedPercentge float64 `json:"usedPercentge"`
 }
 
 func GetRAMUsage() RAM {
@@ -94,10 +95,10 @@ func GetRAMUsage() RAM {
 }
 
 type DISK struct {
-	Total     uint64
-	Free      uint64
-	Avaliable uint64
-	Err       error
+	Total     uint64 `json:"total"`
+	Free      uint64 `json:"free"`
+	Avaliable uint64 `json:"avaliable"`
+	Err       error  `json:"err"`
 }
 
 func GetDiskUsage(path string) DISK {
@@ -117,16 +118,18 @@ func GetDiskUsage(path string) DISK {
 }
 
 type RuntimeStats struct {
-	GoVersion        string
-	OS               string
-	Arch             string
-	CPUs             string
-	Goroutines       string
-	AllocatedMemMB   uint64
-	TotalAllocatedMB uint64
-	SystemMemMB      uint64
-	HeapAllocMB      uint64
-	GCCycles         uint32
+	GoVersion        string `json:"goVersion"`
+	OS               string `json:"os"`
+	User 			 string `json:"user"`
+	Arch             string `json:"arch"`
+	CPUs             string `json:"cpus"`
+	Goroutines       string `json:"goroutines"`
+	AllocatedMemMB   uint64 `json:"allocatedMemMB"`
+	TotalAllocatedMB uint64 `json:"totalAllocatedMB"`
+	SystemMemMB      uint64 `json:"systemMemMB"`
+	HeapAllocMB      uint64 `json:"heapAllocMB"`
+	GCCycles         uint32 `json:"gcCycles"`
+	ConnectedUsers   int 	`json:"connectedclient"`
 }
 
 func GetRuntimeStats() RuntimeStats {
@@ -136,6 +139,12 @@ func GetRuntimeStats() RuntimeStats {
 	arch := runtime.GOARCH
 	cpus := strconv.Itoa(runtime.NumCPU())
 	goroutines := strconv.Itoa(runtime.NumGoroutine())
+	user , err := os.Hostname()
+	totalClients := GetConnectedClients()
+
+	if err != nil {
+		user = "N/A"
+	}
 
 	// 2. Gather memory statistics
 	var ms runtime.MemStats
@@ -148,6 +157,7 @@ func GetRuntimeStats() RuntimeStats {
 	return RuntimeStats{
 		GoVersion:        goVersion,
 		OS:               osName,
+		User:			  user,		
 		Arch:             arch,
 		CPUs:             cpus,
 		Goroutines:       goroutines,
@@ -156,5 +166,6 @@ func GetRuntimeStats() RuntimeStats {
 		SystemMemMB:      ms.Sys / MB,
 		HeapAllocMB:      ms.HeapAlloc / MB,
 		GCCycles:         ms.NumGC,
+		ConnectedUsers: len(totalClients),
 	}
 }
