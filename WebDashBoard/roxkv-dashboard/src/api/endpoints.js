@@ -13,13 +13,10 @@ function joinUrl(base, path) {
   return normalizedBase ? `${normalizedBase}${path}` : path;
 }
 
-export const API_BASE = import.meta.env.VITE_API_BASE || ''; // Main monitoring server
-export const CHAT_ENDPOINT = import.meta.env.VITE_CHAT_BASE || 'localhost:6972'; // ChatWebServer port
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:6971';
+export const CHAT_ENDPOINT = import.meta.env.VITE_CHAT_API_BASE_URL || 'http://localhost:6972';
 export const ENDPOINTS = {
-  // POST /api/chat/ - Send query to master agent
-  // Request:  {"query": "What is the database status?"}
-  // Response: Plain text string from agent
-  chat: joinUrl(CHAT_ENDPOINT, '/api/chat/'),
+  chat: '/api/chat/',
 };
 
 export const SSE_ENDPOINTS = {

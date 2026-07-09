@@ -415,6 +415,7 @@ func init() {
 			"send to all topics",
 			"global broadcast",
 			"announce to everyone",
+			"broadcast to all topics",
 		},
 		Priority:   8,
 		IsMutation: true,

@@ -1,0 +1,277 @@
+@import "tailwindcss";
+
+/* ─── Theme tokens ─────────────────────────────────────────────────────────── */
+@theme {
+  --color-purple-glow: #7c3aed;
+  --color-purple-soft: #a78bfa;
+  --color-purple-deep: #4c1d95;
+  --color-surface: #0a0a0f;
+  --color-surface-raised: #111118;
+  --color-surface-card: #16161f;
+  --color-surface-border: #1e1e2e;
+  --color-text-primary: #f1f1f4;
+  --color-text-secondary: #9898ab;
+  --color-text-muted: #5e5e73;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ─── Base ─────────────────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::selection {
+  background-color: rgba(124, 58, 237, 0.4);
+  color: #fff;
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-purple-glow);
+}
+
+/* ─── Utility classes ──────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(22, 22, 31, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(124, 58, 237, 0.1);
+}
+
+.glass-strong {
+  background: rgba(22, 22, 31, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+}
+
+.glow-border {
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glow-border:hover {
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.15), 0 0 40px rgba(124, 58, 237, 0.05);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #f1f1f4 0%, #a78bfa 50%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-purple {
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 50%, #6d28d9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  color: #fff;
+  padding: 0.875rem 2rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 30px rgba(124, 58, 237, 0.4), 0 0 60px rgba(124, 58, 237, 0.15);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text-primary);
+  padding: 0.875rem 2rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  border-color: rgba(124, 58, 237, 0.6);
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+  transform: translateY(-2px);
+}
+
+/* ─── Hero background grid ─────────────────────────────────────────────────── */
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(124, 58, 237, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.06) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridMove 20s linear infinite;
+}
+
+@keyframes gridMove {
+  0% { background-position: 0 0; }
+  100% { background-position: 60px 60px; }
+}
+
+/* ─── Floating orbs ────────────────────────────────────────────────────────── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.3;
+  animation: orbFloat 8s ease-in-out infinite;
+}
+
+.orb-1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #7c3aed 0%, transparent 70%);
+  top: -100px;
+  right: -100px;
+  animation-delay: 0s;
+}
+
+.orb-2 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, #6d28d9 0%, transparent 70%);
+  bottom: -50px;
+  left: -50px;
+  animation-delay: -4s;
+}
+
+.orb-3 {
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, #a78bfa 0%, transparent 70%);
+  top: 40%;
+  left: 50%;
+  animation-delay: -2s;
+}
+
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(20px, -30px) scale(1.05); }
+  66% { transform: translate(-15px, 20px) scale(0.95); }
+}
+
+/* ─── Terminal decoration ──────────────────────────────────────────────────── */
+.terminal-window {
+  background: rgba(10, 10, 15, 0.9);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  background: rgba(22, 22, 31, 0.8);
+  border-bottom: 1px solid rgba(124, 58, 237, 0.1);
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.terminal-body {
+  padding: 20px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+
+.terminal-body .prompt {
+  color: #a78bfa;
+}
+
+.terminal-body .command {
+  color: #f1f1f4;
+}
+
+.terminal-body .comment {
+  color: var(--color-text-muted);
+}
+
+.terminal-body .output {
+  color: #10b981;
+}
+
+/* ─── Section divider ──────────────────────────────────────────────────────── */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(124, 58, 237, 0.2) 50%, transparent 100%);
+}
+
+/* ─── Architecture line animation ──────────────────────────────────────────── */
+.arch-line {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: drawLine 1.5s ease forwards;
+}
+
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+
+/* ─── Pulse dot ────────────────────────────────────────────────────────────── */
+.pulse-dot {
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+
+/* ─── Image modal ──────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}

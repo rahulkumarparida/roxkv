@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const port = Number(env.PORT || env.FRONTEND_PORT || 5173)
   const usePolling = env.CHOKIDAR_USEPOLLING === 'true'
+  const apiBaseUrl = env.VITE_API_BASE_URL || env.VITE_BACKEND_SSE_TARGET || 'http://localhost:6971'
+  const chatApiBaseUrl = env.VITE_CHAT_API_BASE_URL || env.VITE_BACKEND_CHAT_TARGET || 'http://localhost:6972'
 
   return {
     plugins: [react(), tailwindcss()],
@@ -19,11 +21,11 @@ export default defineConfig(({ mode }) => {
       },
       proxy: {
         '/api/events': {
-          target: env.VITE_BACKEND_SSE_TARGET || 'http://localhost:6971',
+          target: apiBaseUrl,
           changeOrigin: true,
         },
         '/api/chat': {
-          target: env.VITE_BACKEND_CHAT_TARGET || 'http://localhost:6972',
+          target: chatApiBaseUrl,
           changeOrigin: true,
         },
       },

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { chatApi } from './client';
 import { ENDPOINTS } from './endpoints';
 
 /**
@@ -56,20 +56,18 @@ const DEFAULT_RESPONSE = {
 export async function sendChatMessage(payload) {
   const startTime = Date.now();
   try {
-    // Send: {query: "user's message"}
-    const response = await axios.post(
+    const response = await chatApi.post(
       ENDPOINTS.chat,
-      { query: payload.message }, // ChatWebServer expects "query" field
+      { query: payload.message },
       {
         timeout: 300000,
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'text/plain',
+          Accept: 'text/plain',
         },
-      }
+      },
     );
 
-    // Response is a plain string, wrap it in expected format
     const latency = Date.now() - startTime;
     const responseText = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
 
@@ -80,7 +78,6 @@ export async function sendChatMessage(payload) {
     };
   } catch (error) {
     console.error('[API] Chat request failed:', error.message);
-    // Fallback to mock response
     return mockChatResponse(payload.message);
   }
 }

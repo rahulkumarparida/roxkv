@@ -259,5 +259,5 @@ func LiveHistoryData() []string{
 
 	dataArr := strings.Split(data,"\n")
 	slices.Reverse(dataArr)
-	return dataArr[1:11]
+	return dataArr[1:len(dataArr)-1] // Exclude the first and last empty lines	
 }

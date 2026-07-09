@@ -69,6 +69,8 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       CHOKIDAR_USEPOLLING: ${CHOKIDAR_USEPOLLING:-true}
       PORT: ${FRONTEND_PORT:-5173}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:6971}
+      VITE_CHAT_API_BASE_URL: ${VITE_CHAT_API_BASE_URL:-http://localhost:6972}
       VITE_BACKEND_SSE_TARGET: ${VITE_BACKEND_SSE_TARGET:-http://backend:6971}
       VITE_BACKEND_CHAT_TARGET: ${VITE_BACKEND_CHAT_TARGET:-http://backend:6972}
       VITE_CONNECTION_HOST_LABEL: ${VITE_CONNECTION_HOST_LABEL:-backend via frontend proxy}
