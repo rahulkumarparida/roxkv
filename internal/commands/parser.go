@@ -307,6 +307,8 @@ func LoaderCommand(stre *store.MemoryAlloc,namespace *store.NameSpace) int{
 	logmsg:= "All keys avaliable in DB are loaded to RAM"
 	logger.SucessLog(logmsg)
 	count := persistence.LoadJsons(dbpath,stre,namespace)
+	
+	store.TTLMetricsContainer.PermanentKeys += count
 	return count
 }
 

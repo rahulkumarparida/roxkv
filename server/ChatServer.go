@@ -47,8 +47,10 @@ func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, namesp
 		}
 
 		// Route all requests through the master orchestrator so specialist-agent results are collected and summarized centrally.
-		master.MasterAgent(input, stre, user, namespace, agent)
+		data := master.MasterAgent(input, stre, user, namespace, agent)
 
+		dataString := fmt.Sprintf("%v",data)
+		user.Conn.Write([]byte("\nroxai> "+dataString+"\n"))
 	}
 
 }

@@ -38,24 +38,49 @@ const MOCK_RESPONSES = [
   },
 ];
 
-/** Default fallback response */
+/** Fallback response when backend is unavailable */
 const DEFAULT_RESPONSE = {
-  response: `I've analyzed your query against the database state.\n\n**Current Database Status**\n\n* **Status:** Active and healthy\n* **Keys:** 4 stored keys\n* **Snapshots:** 25 snapshots (52.9 KB total)\n* **Storage Health:** Optimal\n\nIs there anything specific you'd like me to investigate? You can ask about:\n- TTL statistics\n- Key listings\n- Storage health\n- Snapshot details\n- Active connections`,
+  response: `Backend connection failed. Using mock response.\n\n**Current Database Status**\n\n* **Status:** Active and healthy\n* **Keys:** 4 stored keys\n* **Snapshots:** 25 snapshots (52.9 KB total)\n* **Storage Health:** Optimal`,
   status: 'success',
   latency_ms: 450,
 };
 
 /**
- * Sends a chat message to the LLM endpoint.
- * Falls back to mock implementation when real backend is unavailable.
- * @param {ChatRequest} payload
- * @returns {Promise<ChatResponse>}
+ * Sends a chat message to the ChatWebServer endpoint.
+ * The backend expects: {"query": "user message"}
+ * The backend returns a plain string response (not JSON).
+ * Converts it to the expected internal format for ChatService.
+ * @param {ChatRequest} payload - {message: "...", context_keys?: [...]}
+ * @returns {Promise<ChatResponse>} - {response: "...", status: "success", latency_ms: number}
  */
 export async function sendChatMessage(payload) {
+  const startTime = Date.now();
   try {
-    const response = await axios.post(ENDPOINTS.chat, payload, { timeout: 5000 });
-    return response.data;
-  } catch {
+    // Send: {query: "user's message"}
+    const response = await axios.post(
+      ENDPOINTS.chat,
+      { query: payload.message }, // ChatWebServer expects "query" field
+      {
+        timeout: 300000,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/plain',
+        },
+      }
+    );
+
+    // Response is a plain string, wrap it in expected format
+    const latency = Date.now() - startTime;
+    const responseText = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+
+    return {
+      response: responseText,
+      status: 'success',
+      latency_ms: latency,
+    };
+  } catch (error) {
+    console.error('[API] Chat request failed:', error.message);
+    // Fallback to mock response
     return mockChatResponse(payload.message);
   }
 }

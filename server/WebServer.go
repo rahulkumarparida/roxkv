@@ -17,12 +17,10 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-var StoreHelper *store.MemoryAlloc
 
 // Accepting the HTTP request as HTTP
-func WebServer(store *store.MemoryAlloc) {
+func WebServer() {
 
-	StoreHelper = store
 
 	fmt.Println("Listening Webserver at localhost:6971")
 
@@ -71,7 +69,7 @@ func SseHandler(w http.ResponseWriter, r *http.Request) {
 		case <-t.C:
 
 			// Remove the client argument later after your Pub/Sub refactor.
-			data := HandleResponseData(toolrequiredName, nil, StoreHelper)
+			data := HandleResponseData(toolrequiredName, nil, store.StoreHelper)
 
 			stringifiedData, err := json.Marshal(data)
 			if err != nil {
@@ -177,7 +175,7 @@ func DataBaseData(client *utils.NewClient) DataBaseInfo {
 
 	ttlMetrics := metrics.GetTTLMetrics()
 
-	allKeys := metrics.LiveItems(StoreHelper)
+	allKeys := metrics.LiveItems(store.StoreHelper)
 	topics := GetTopicList(client)
 	var TotalKeysSize int64
 	for _, key := range allKeys {

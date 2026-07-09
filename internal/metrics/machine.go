@@ -214,7 +214,7 @@ func NetworkStatistics(netStats chan<- NetworkStat) {
 			Name : current.Name,
 			}
 		
-			fmt.Printf("[%s] Down: %.2f Kbps | Up: %.2f Kbps\n", current.Name, rxSpeedKbps, txSpeedKbps)
+			// fmt.Printf("[%s] Down: %.2f Kbps | Up: %.2f Kbps\n", current.Name, rxSpeedKbps, txSpeedKbps)
 		}
 
 		prevStats = currentStats

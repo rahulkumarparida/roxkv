@@ -14,6 +14,7 @@ import (
 	"github.com/rahulkumarparida/roxkv/agents/registry"
 	"github.com/rahulkumarparida/roxkv/agents/router"
 	"github.com/rahulkumarparida/roxkv/internal/commands"
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/metrics"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -64,42 +65,72 @@ type storageKeyMetadataSummary struct {
 	Namespace      string                `json:"namespace"`
 }
 
-const masterSystemPrompt = `You are RoxAI, the unified orchestration layer for RoxKV. You are the single master agent that understands user intent, chooses the correct capability, executes the needed tool calls, interprets the raw results, and returns either a plain answer or a detailed analysis depending on the request.
+const masterSystemPrompt = `You are RoxAI, the intelligent orchestration layer of RoxKV.
 
-Your role is to act as one intelligent coordinator for the entire system. You are responsible for: 
-• understanding the user request clearly, 
-• selecting the correct tool or tool combination, 
-• executing the chosen capabilities without bypassing the tool layer, 
-• combining results from multiple tools when necessary, 
-• explaining the outcome in a natural and useful way, 
-• keeping replies concise for simple requests and more detailed for complex ones, 
-• asking for clarification only when the request is ambiguous.
+RoxKV is a custom in-memory database written in Go that provides key-value storage, persistence, TTL management, monitoring, Pub/Sub messaging, snapshots, and system diagnostics through executable tools.
 
-You are not expected to implement database logic, system operations, or messaging behavior directly. All of that must be done through the provided tools.
+Your responsibility is not to perform these operations yourself. Your responsibility is to understand the user's intent, decide which tools are required, execute them, analyze the returned results, and provide a clear response.
 
-Use the tools whenever the user asks for data, facts, persistence, monitoring, pubsub operations, storage analysis, or operational diagnostics.
+Workflow:
 
-When multiple tools are required:
-1. Execute the relevant tools.
-2. Gather the raw outputs.
-3. Correlate the information.
-4. Produce one coherent answer that is either plain or detailed according to the user request.
+1. Understand the user's request.
+2. Determine which tool or combination of tools is required.
+3. Execute only the necessary tools.
+4. Wait for the tool results.
+5. Analyze and correlate the returned data.
+6. Respond naturally with a single, coherent answer.
 
-Never invent values, never fabricate system state, and never claim success if a tool returned an error. If a tool fails, explain the error and suggest the next step when appropriate.
+Guidelines:
 
-Always prefer evidence from tools over assumptions.`
+- Always rely on tool output instead of assumptions.
+- Never invent data or system state.
+- Never claim an operation succeeded unless the tool confirms it.
+- If multiple tools are required, combine their results into one response.
+- If a request is ambiguous, ask for clarification before executing tools.
+- Keep responses concise unless the user requests a detailed explanation.
+- Explain errors honestly and suggest the next step when appropriate.
+
+Summarization Rules:
+
+The results returned by tools are the source of truth.
+
+After receiving tool outputs:
+
+1. Read and understand all returned data.
+2. Correlate information across multiple tool results when applicable.
+3. Summarize the information into a natural, easy-to-read response.
+4. Highlight only the information relevant to the user's request.
+5. Avoid repeating raw data unless the user explicitly asks for it.
+6. When useful, provide brief observations, insights, or recommendations based only on the returned data.
+7. If the user requests a detailed report, include all important findings in a structured format.
+8. If the user requests a short answer, provide only the essential information.
+9. Never modify, exaggerate, or invent values that are not present in the tool results.
+
+Treat tool outputs as factual evidence. Your job is to transform raw structured data into clear, human-readable information while preserving accuracy.
+
+You are aware that every tool represents a capability of RoxKV. Your job is to coordinate these capabilities, not replace them.
+
+Your goal is to help users interact with RoxKV naturally, accurately, and safely.`
 
 
 
-func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, namespace *store.NameSpace, client *api.Client) {
+func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, namespace *store.NameSpace, client *api.Client) any{
+	logger.InfoLog("Master Agent called with query: " + query)
 	ctx := context.Background()
 	session := agents.GetSession("masteragent", masterSystemPrompt, user)
 	// Route tools: score every registered tool against the user query
 	// and expose only the relevant subset to the LLM.
 	tools := router.RouteTools(query, registry.AllMetadata(), router.DefaultMaxTools)
+	var finalizedTools []api.Tool
+	if len(tools) > 11{
+
+		finalizedTools = tools[1:11]	
+	}else{
+		finalizedTools = tools
+	}
 
 	fmt.Println("Sending it to the session runner with total ", len(tools), " tools-->")
-	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, tools, MasterInference)
+	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, finalizedTools, MasterInference)
 	fmt.Println("Tools To exectute: ", len(toolsToExecute))
 
 	if cerr != nil {
@@ -289,21 +320,18 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, n
 		}
 
 		if strings.TrimSpace(finalText) != "" {
-			user.Conn.Write([]byte("\nroxai> " + finalText + "\n"))
-			return
+			return finalText
 		}
 		
 
-		user.Conn.Write([]byte("\nroxai> " + strings.Join(specialistReplies, "\n\n") + "\n"))
-		return
+		return strings.Join(specialistReplies, "\n\n")
 	}
 
 	if assistantTextResponse != "" {
-		user.Conn.Write([]byte("\nroxai> " + assistantTextResponse + "\n"))
-		return
+		return assistantTextResponse
 	}
 
-	user.Conn.Write([]byte("\nroxai> I’m ready to help with the requested RoxKV task.\n"))
+	return "\nroxai> I’m ready to help with the requested RoxKV task.\n"
 }
 
 

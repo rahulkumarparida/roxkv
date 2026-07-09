@@ -46,8 +46,6 @@ func (s *AgentSession) Run(ctx context.Context, client *api.Client, model, query
 		Content: query,
 	})
 
-	logger.InfoLog("User queried: " + query)
-
 	req := &api.ChatRequest{
 		Model:    model,
 		Messages: append([]api.Message(nil), s.messages...),

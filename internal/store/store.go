@@ -10,6 +10,8 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
+var StoreHelper *MemoryAlloc
+
 // TTl metrics
 type TTLInfo struct {
 	Key       string        `json:"key"`

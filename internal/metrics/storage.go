@@ -9,6 +9,7 @@ import (
 
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
+	"github.com/rahulkumarparida/roxkv/internal/worker"
 )
 
 type KeyNSize struct {
@@ -305,14 +306,13 @@ func NextSnapshotTime() float64 {
 
 	data := GetLatestSnapshot()
 	
-
-	timeleft := data.ModifiedAt.Sub(time.Now())
-	timedur := (10*time.Minute) - timeleft
-	if timeleft < 0 {
-		return 0
+	// fmt.Println("Data:", data)
+	timeleft := time.Until(data.ModifiedAt)
+	if timeleft > 0 {
+		worker.TakeSnapShot(store.StoreHelper, time.Now(), utils.TotalConnecntions)
 	}
 
-	return timedur.Seconds()
+	return timeleft.Seconds()
 }
 
 func GetPersistenceHealth() PersistenceHealth {

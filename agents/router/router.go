@@ -24,7 +24,9 @@ var stopWords = map[string]bool{
 	"your": true, "he": true, "she": true, "they": true, "them": true,
 	"this": true, "that": true, "what": true, "which": true, "who": true,
 	"how": true, "can": true, "will": true, "would": true, "should": true,
-	"could": true, "please": true, "tell": true, "about": true,
+	"could": true, "please": true, "tell": true, "about": true,"also": true, "just": true, "like": true, "some": true, "any": true,"so": true, "if": true, "then": true, "than": true, "but": true,
+	"because": true, "while": true, "where": true, "when": true, "all": true,
+	"anyone": true, "everyone": true, "someone": true, "noone": true,
 }
 
 // scoredTool pairs a metadata entry with its computed relevance score.

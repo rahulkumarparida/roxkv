@@ -50,6 +50,7 @@ func TakeSnapShot(ms *store.MemoryAlloc, snaptime time.Time, clientsconnected []
 	gatherData.Client = clientData
 	gatherData.CreatedAt = snaptime
 
+
 	persistence.StoreToJson(dirPath, filename, gatherData)
 
 }

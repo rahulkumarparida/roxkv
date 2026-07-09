@@ -78,18 +78,7 @@ const ChatMessage = memo(function ChatMessage({ message }) {
             </div>
           )}
         </div>
-        {!message.isStreaming && (
-          <div className="flex items-center gap-3 mt-2 ml-1">
-            {['\ud83d\udc4d', '\ud83d\udc4e', '\ud83d\udccb'].map((emoji, i) => (
-              <button
-                key={i}
-                className="text-xs text-text-muted hover:text-text-primary transition-colors p-1 rounded hover:bg-white/5"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        )}
+
       </div>
     </div>
   );

@@ -22,6 +22,7 @@ import (
 
 const MaxConnections = 5
 
+
 var mutex = sync.RWMutex{}
 
 func DeleteClientListing(target *utils.NewClient) {
@@ -122,7 +123,7 @@ func Server() {
 		log.Fatal(err)
 	}
 
-	store, namespace := store.StoreInMemory()
+	stre, namespace := store.StoreInMemory()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	listner, err := net.Listen("tcp", ":6969")
@@ -134,12 +135,12 @@ func Server() {
 	}
 	defer listner.Close()
 	utils.ServerStarted = time.Now()
-	
-	go worker.SnapshotWorker(ctx, store, &mutex, utils.TotalConnecntions)
+	store.StoreHelper = stre
+	go worker.SnapshotWorker(ctx, stre, &mutex, utils.TotalConnecntions)
 	fmt.Println("Listening CLI Connection at localhost:6969")
-	go ChatServer(store, namespace,agent)
-	go WebServer(store)
-	go WebChatServer(store,namespace,agent)
+	go ChatServer(stre, namespace,agent)
+	go WebServer()
+	go WebChatServer(stre,namespace,agent)
 
 	for {
 
@@ -162,7 +163,7 @@ func Server() {
 		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 		mutex.Unlock()
 		fmt.Println("Connected: ", client.ID)
-		go handleConnection(&client, store, namespace)
+		go handleConnection(&client, stre, namespace)
 
 	}
 
