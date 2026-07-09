@@ -25,6 +25,7 @@ func WebChatServer(stre *store.MemoryAlloc, namespace *store.NameSpace, agent *a
 
 
 	router := mux.NewRouter()
+	router.HandleFunc("/healthz", HealthHandler).Methods("GET")
 	router.HandleFunc("/api/chat/",callAI).Methods("POST", "OPTIONS")
 	fmt.Println("Listening WebChat API at localhost:6972")
 

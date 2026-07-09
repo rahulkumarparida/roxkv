@@ -25,6 +25,7 @@ func WebServer() {
 	fmt.Println("Listening Webserver at localhost:6971")
 
 	router := mux.NewRouter()
+	router.HandleFunc("/healthz", HealthHandler).Methods("GET")
 	router.HandleFunc("/api/events/{name}", SseHandler).Methods("GET")
 	err := http.ListenAndServe(":6971", router)
 
@@ -32,6 +33,12 @@ func WebServer() {
 		log.Fatal(err)
 	}
 
+}
+
+func HealthHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
 }
 
 func SseHandler(w http.ResponseWriter, r *http.Request) {

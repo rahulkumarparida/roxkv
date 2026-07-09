@@ -3,20 +3,6 @@
  * All endpoint URLs, event types, and configuration values live here.
  */
 
-/** Base URL for the Go backend API */
-export const API_BASE = 'http://localhost:6971';
-
-/** Chat endpoint for LLM communication */
-export const CHAT_ENDPOINT = `${API_BASE}/api/chat`;
-
-/** Server Sent Events endpoint configuration */
-export const SSE_ENDPOINTS = {
-  monitor: `${API_BASE}/sse/monitor`,
-  storage: `${API_BASE}/sse/storage`,
-  database: `${API_BASE}/sse/database`,
-  activity: `${API_BASE}/sse/activity`,
-};
-
 /** Activity event type definitions with display properties */
 export const EVENT_TYPES = {
   USER_CONNECTED: { label: 'User connected', color: 'text-green-400', dotColor: 'bg-green-400' },
@@ -56,5 +42,5 @@ export const APP_META = {
   version: 'v2.1.0',
   name: 'ROXX KV',
   tagline: 'In-Memory Database with AI Agent',
-  connectionHost: 'localhost:6971',
+  connectionHost: import.meta.env.VITE_CONNECTION_HOST_LABEL || 'backend via frontend proxy',
 };
