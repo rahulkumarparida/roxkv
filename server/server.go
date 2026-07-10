@@ -91,7 +91,7 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc, namespa
 }
 
 func ClearConnections(t time.Time, client *utils.NewClient) {
-	if time.Since(client.LastUsed) > (10 * time.Minute) {
+	if time.Since(client.LastUsed) > (40 * time.Minute) {
 		fmt.Println("Client died: ", client.ID)
 		client.Conn.Write([]byte("Client was Inactive for too long \n"))
 		client.Conn.Close()

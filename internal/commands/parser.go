@@ -371,7 +371,11 @@ func UnsubscribeCommand(client *utils.NewClient, input []string) string{
 
 func TopicsCommand(client *utils.NewClient){
 	
-	pubsub.GetTopics(client)
+	data := pubsub.GetTopics(client)
+
+	for idx, topic := range data {
+		client.Conn.Write([]byte(strconv.Itoa(idx)+". "+topic+"\n"))
+	}
 
 }
 

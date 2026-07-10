@@ -1,8 +1,19 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Monitor } from 'lucide-react';
 import { dashboardTabs } from '../data/content';
 import SectionWrapper from './SectionWrapper';
+import dashboardImage from '../assets/Dasboard.png';
+import cliImage from '../assets/cli.png';
+import monitoringImage from '../assets/Monitoring.png';
+import architectureImage from '../assets/Architecture.png';
+
+const tabImages = {
+  dashboard: dashboardImage,
+  cli: cliImage,
+  monitoring: monitoringImage,
+  architecture: architectureImage,
+  chat: dashboardImage,
+};
 
 export default function DashboardShowcase() {
   const [activeTab, setActiveTab] = useState(0);
@@ -45,17 +56,13 @@ export default function DashboardShowcase() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
-            className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-purple-900/20 to-[#0a0a0f] min-h-[400px]"
+            className="h-full min-h-[260px] sm:min-h-[400px]"
           >
-            <div className="border-2 border-dashed border-[#1e1e2e] rounded-xl p-12 flex flex-col items-center">
-              <Monitor className="w-12 h-12 text-purple-500/30" />
-              <p className="text-lg font-medium text-[#5e5e73] mt-4">
-                {dashboardTabs[activeTab].label}
-              </p>
-              <p className="text-sm text-[#3e3e53] mt-1">
-                Screenshot placeholder
-              </p>
-            </div>
+            <img
+              src={tabImages[dashboardTabs[activeTab].id]}
+              alt={`${dashboardTabs[activeTab].label} preview`}
+              className="h-full w-full object-cover object-top"
+            />
           </motion.div>
         </AnimatePresence>
       </div>

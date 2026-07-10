@@ -79,6 +79,7 @@ func init() {
 			"list stored keys",
 			"display stored keys",
 			"enumerate all keys",
+			"list all the keys",
 		},
 		Priority:   8,
 		IsMutation: false,

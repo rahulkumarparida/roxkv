@@ -204,9 +204,6 @@ func GetTopics(client *utils.NewClient) []string {
 	copy(topics, Helper.ChannelNames)
 	Helper.Mu.Unlock()
 
-	// for idx, topic := range topics {
-	// 	client.Conn.Write([]byte(strconv.Itoa(idx)+". "+topic+"\n"))
-	// }
 	return topics
 }
 

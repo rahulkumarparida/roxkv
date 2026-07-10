@@ -46,7 +46,7 @@ export default function Navbar() {
           {/* Desktop CTA */}
           <div className="hidden lg:flex items-center">
             <a
-              href="https://github.com/RahulKumarPariworked/roxkv"
+              href="https://github.com/rahulkumarparida/roxkv"
               target="_blank"
               rel="noopener noreferrer"
               className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"
@@ -89,13 +89,13 @@ export default function Navbar() {
                 </a>
               ))}
               <a
-                href="https://github.com/RahulKumarPariworked/roxkv"
+                href="https://github.com/rahulkumarparida/roxkv"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm mt-2"
                 onClick={() => setIsOpen(false)}
               >
-                <Github className="w-4 h-4" />
+                <GitBranch className="w-4 h-4" />
                 GitHub
               </a>
             </div>

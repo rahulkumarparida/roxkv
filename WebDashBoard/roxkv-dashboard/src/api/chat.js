@@ -60,7 +60,7 @@ export async function sendChatMessage(payload) {
       ENDPOINTS.chat,
       { query: payload.message },
       {
-        timeout: 300000,
+        timeout: 3000000,
         headers: {
           'Content-Type': 'application/json',
           Accept: 'text/plain',

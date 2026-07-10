@@ -1,5 +1,6 @@
 import React from 'react';
 import { about } from '../data/content';
+import { ExternalLink, UserCircle2 } from 'lucide-react';
 import SectionWrapper from './SectionWrapper';
 
 export default function About() {
@@ -11,6 +12,26 @@ export default function About() {
         <p className="text-[#9898ab] text-base sm:text-lg leading-relaxed mt-6">
           {about.description}
         </p>
+        <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
+          <a
+            href={about.repoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary"
+          >
+            <ExternalLink className="w-4 h-4" />
+            View Project on GitHub
+          </a>
+          <a
+            href={about.profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary"
+          >
+            <UserCircle2 className="w-4 h-4" />
+            {about.author}
+          </a>
+        </div>
       </div>
     </SectionWrapper>
   );

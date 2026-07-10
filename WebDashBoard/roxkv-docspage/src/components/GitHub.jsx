@@ -1,6 +1,6 @@
 import React from 'react';
 import { github } from '../data/content';
-import { GitBranch, Star, GitCommit, ExternalLink, BookOpen } from 'lucide-react';
+import { GitBranch, Star, GitCommit, ExternalLink, BookOpen, UserCircle2 } from 'lucide-react';
 import SectionWrapper from './SectionWrapper';
 
 export default function GitHub() {
@@ -28,6 +28,15 @@ export default function GitHub() {
             <BookOpen className="w-4 h-4" /> Read Documentation
           </a>
         </div>
+        <a
+          href={github.profileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 mt-6 text-sm text-[#9898ab] hover:text-purple-300 transition-colors"
+        >
+          <UserCircle2 className="w-4 h-4" />
+          Built by @{github.ownerName}
+        </a>
       </div>
     </SectionWrapper>
   );

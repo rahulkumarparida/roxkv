@@ -165,23 +165,27 @@ export const techStack = [
 
 // ─── Demo ───────────────────────────────────────────────────────────────────
 export const demo = {
-  heading: 'Watch RoxAI in Action',
+  heading: 'RoxAI Is Under Active Development',
   description:
-    'See how RoxAI transforms natural language queries into intelligent database operations — from health checks to snapshot management, all powered by local AI.',
-  ctaLabel: 'Watch Full Demo',
-  ctaHref: '#',
-  videoPlaceholder: true,
+    'The live demo experience is still being refined. RoxAI is under continuous development, with ongoing work focused on making the orchestration flow more robust, improving reliability across tool execution paths, tightening edge-case handling, and polishing the end-to-end user experience before a full showcase is published.',
+  details: [
+    'The current focus is on strengthening the AI-to-tool execution pipeline so natural language requests behave more consistently under real usage.',
+    'Work is continuing on stability improvements, better error recovery, cleaner streaming responses, and stronger operational visibility throughout the system.',
+    'Rather than shipping a rushed demo section, this page now reflects that RoxAI is being actively improved to make the final experience more dependable, more accurate, and more production-ready.',
+  ],
 };
 
 // ─── GitHub ─────────────────────────────────────────────────────────────────
 export const github = {
   repoName: 'rahulkumarparida/roxkv',
+  ownerName: 'rahulkumarparida',
   description:
     'A Redis-like in-memory key-value store built from scratch in Go, featuring 4 concurrent servers (TCP, AI TCP, SSE, AI HTTP), 45 AI tools, real-time dashboard, and containerized deployment.',
   stars: '★',
   commits: '100+',
   repoUrl: 'https://github.com/rahulkumarparida/roxkv',
   docsUrl: 'https://github.com/rahulkumarparida/roxkv#readme',
+  profileUrl: 'https://github.com/rahulkumarparida/',
 };
 
 // ─── Run Locally ────────────────────────────────────────────────────────────
@@ -199,13 +203,10 @@ export const runLocally = {
 
 // ─── Gallery ────────────────────────────────────────────────────────────────
 export const gallery = [
-  { id: 'dashboard', label: 'Dashboard', placeholder: true },
-  { id: 'cli', label: 'CLI', placeholder: true },
-  { id: 'architecture', label: 'Architecture', placeholder: true },
-  { id: 'monitoring', label: 'Monitoring', placeholder: true },
-  { id: 'storage', label: 'Storage', placeholder: true },
-  { id: 'pubsub', label: 'PubSub', placeholder: true },
-  { id: 'chat', label: 'AI Chat', placeholder: true },
+  { id: 'dashboard', label: 'Dashboard', description: 'Main dashboard with health, keys, and system metrics.' },
+  { id: 'cli', label: 'CLI', description: 'Terminal-style interface for direct RoxKV command execution.' },
+  { id: 'architecture', label: 'Architecture', description: 'High-level system view of the RoxAI orchestration flow.' },
+  { id: 'monitoring', label: 'Monitoring', description: 'Live operational metrics for CPU, memory, and runtime activity.' },
 ];
 
 // ─── Roadmap ────────────────────────────────────────────────────────────────
@@ -224,6 +225,9 @@ export const about = {
   heading: 'About the Project',
   description:
     'RoxKV was built completely from scratch as an educational systems programming project — a deep dive into building a Redis-like database server in Go. What started as a learning exercise in TCP servers, concurrent data structures, and protocol parsing evolved into a full-featured AI-powered operational platform with natural language database management, real-time monitoring, and containerized deployment.',
+  repoUrl: 'https://github.com/rahulkumarparida/roxkv',
+  profileUrl: 'https://github.com/rahulkumarparida/',
+  author: 'Rahul Kumar Parida',
 };
 
 // ─── Footer ─────────────────────────────────────────────────────────────────
@@ -237,9 +241,9 @@ export const footer = {
       { label: 'License', href: 'https://github.com/rahulkumarparida/roxkv/blob/main/LICENSE' },
     ],
     connect: [
-      { label: 'LinkedIn', href: 'https://linkedin.com/in/rahulkumarparida' },
-      { label: 'Email', href: 'mailto:rahulkumarparida@gmail.com' },
-      { label: 'GitHub', href: 'https://github.com/rahulkumarparida' },
+      { label: 'GitHub', href: 'https://github.com/rahulkumarparida/' },
+      { label: 'LinkedIn', href: 'https://www.linkedin.com/in/rahul-kumar-parida-b6219a292/' },
+      { label: 'X', href: 'https://x.com/rahulkuparida' },
     ],
   },
   copyright: `© ${new Date().getFullYear()} RoxAI. All rights reserved.`,

@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
-import { Play, GitBranch, Bot, Terminal } from 'lucide-react';
+import { Play, GitBranch, Bot } from 'lucide-react';
 import { hero } from '../data/content';
-import logo from '../assets/roxkvLogo.png';
+import heroVisual from '../assets/roxkvLogo.png';
 
 const ease = [0.25, 0.4, 0.25, 1];
 
@@ -18,7 +18,7 @@ export default function Hero() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 text-center max-w-4xl mx-auto px-4 pt-24">
+      <div className="relative z-10 text-center max-w-5xl mx-auto px-4 pt-24">
         {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -82,11 +82,26 @@ export default function Hero() {
           </a>
         </motion.div>
 
+        <motion.div
+          initial={{ opacity: 0, y: 30, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.8, delay: 0.7, ease }}
+          className="mt-14 flex justify-center"
+        >
+          <div className="glass glow-border rounded-[2rem] px-8 py-6 sm:px-12 sm:py-8">
+            <img
+              src={heroVisual}
+              alt="RoxKV layered database illustration"
+              className="w-44 sm:w-56 md:w-64 h-auto drop-shadow-[0_20px_60px_rgba(124,58,237,0.35)]"
+            />
+          </div>
+        </motion.div>
+
         {/* Terminal Decoration */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.8, ease }}
+          transition={{ duration: 0.7, delay: 0.9, ease }}
           className="max-w-lg mx-auto mt-16"
         >
           <div className="terminal-window">
