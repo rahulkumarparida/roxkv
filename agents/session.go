@@ -58,7 +58,6 @@ func (s *AgentSession) Run(ctx context.Context, client *api.Client, model, query
 
 	var toolCalls []api.ToolCall
 	var assistantText string
-	fmt.Println("Requeted to LLM:", req)
 
 	err := client.Chat(ctx, req, func(resp api.ChatResponse) error {
 		if len(resp.Message.ToolCalls) > 0 {

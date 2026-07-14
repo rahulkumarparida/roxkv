@@ -115,7 +115,7 @@ The AI inference requests and the real-time telemetry streams operate as strictl
 ```mermaid
 graph TD
     User([User]) -->|Browser| Dashboard[React Web Dashboard]
-    Dashboard -->|HTTP REST| API[Gin HTTP API]
+    Dashboard -->|HTTP REST| API[HTTP API]
     Dashboard -->|SSE| Telemetry[Telemetry Stream]
     
     API --> MasterAgent[Master Agent]
@@ -172,7 +172,7 @@ graph LR
     React[React Application]
     
     SubGraph2[Server Side]
-    Gin[Gin Router]
+    Gin[Router]
     SSEHandler[SSE Broadcaster]
     Metrics[Metrics Aggregator]
     

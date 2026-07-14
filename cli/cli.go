@@ -11,46 +11,39 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/worker"
 )
-func CLIUI(){
-	ctx , cancel := context.WithCancel(context.Background())
-	
+
+func CLIUI() {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	defer cancel()
 
-	store,namespace := store.StoreInMemory()
+	stre, _ := store.StoreInMemory()
 
-	for{
-		worker.ExpiryWorker(ctx,store)
-		
-		rl , err := readline.New("roxkv> ")
+	for {
+		worker.ExpiryWorker(ctx, stre)
+
+		rl, err := readline.New("roxkv> ")
 		if err != nil {
 			fmt.Println("Error while initialising readline")
 			break
 		}
 		defer rl.Close()
 
-		line , err := rl.Readline()
+		line, err := rl.Readline()
 		if err != nil {
 			fmt.Println("Error while reading data")
 			continue
 		}
 
-
-		// This is where we parse the data 
+		// This is where we parse the data
 		comandArgs := strings.Fields(line)
-
 
 		if line == "q" {
 			break
 		}
 
-		commands.ParseCommands(store,namespace,comandArgs,nil)
-
+		commands.ParseCommands(stre, comandArgs, nil)
 
 	}
-			
 
-				
-
-				
-			
 }

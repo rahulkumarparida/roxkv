@@ -112,9 +112,7 @@ You are aware that every tool represents a capability of RoxKV. Your job is to c
 
 Your goal is to help users interact with RoxKV naturally, accurately, and safely.`
 
-
-
-func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, namespace *store.NameSpace, client *api.Client) any{
+func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, client *api.Client) any {
 	logger.InfoLog("Master Agent called with query: " + query)
 	ctx := context.Background()
 	session := agents.GetSession("masteragent", masterSystemPrompt, user)
@@ -122,16 +120,15 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, n
 	// and expose only the relevant subset to the LLM.
 	tools := router.RouteTools(query, registry.AllMetadata(), router.DefaultMaxTools)
 	var finalizedTools []api.Tool
-	if len(tools) > 11{
+	if len(tools) > 6 {
 
-		finalizedTools = tools[1:11]	
-	}else{
+		finalizedTools = tools[1:6]
+	} else {
 		finalizedTools = tools
 	}
 
 	fmt.Println("Sending it to the session runner with total ", len(tools), " tools-->")
 	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, finalizedTools, MasterInference)
-	fmt.Println("Tools To exectute: ", len(toolsToExecute))
 
 	if cerr != nil {
 		log.Fatalf("Master orchestrator API call failed: %v", cerr)
@@ -147,6 +144,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, n
 
 			var args masterToolQueryArgs
 			_ = json.Unmarshal(argsByte, &args)
+			fmt.Println("Arguments Here :", args)
 
 			queryText := strings.TrimSpace(args.Query)
 
@@ -157,159 +155,158 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, n
 			var response any
 
 			switch tool.Function.Name {
-					case "get":
-					var args struct {
-						Key string `json:"key"`
-					}
-					_ = json.Unmarshal(argsByte, &args)
-					result := store.GetKv(stre, strings.TrimSpace(args.Key))
-					response = result.Val
-				case "set":
-					var args struct {
-						Key   string `json:"key"`
-						Value string `json:"value"`
-					}
-					_ = json.Unmarshal(argsByte, &args)
+			case "get":
+				var args struct {
+					Key string `json:"key"`
+				}
+				_ = json.Unmarshal(argsByte, &args)
+				result := store.GetKv(stre, strings.TrimSpace(args.Key))
+				response = result.Val
+			case "set":
+				var args struct {
+					Key   string `json:"key"`
+					Value string `json:"value"`
+				}
+				_ = json.Unmarshal(argsByte, &args)
 
-					meta := store.Metadata{
-						TTL:           time.Time{},
-						UpdatedAt:     time.Now(),
-						LastAcessedBy: user,
-						Size:          int64(len(args.Value)),
-					}
-					item := store.Item{
-						Key:  strings.TrimSpace(args.Key),
-						Val:  strings.TrimSpace(args.Value),
-						Meta: meta,
-					}
+				meta := store.Metadata{
+					TTL:           time.Time{},
+					UpdatedAt:     time.Now(),
+					LastAcessedBy: user,
+					Size:          int64(len(args.Value)),
+				}
+				item := store.Item{
+					Key:  strings.TrimSpace(args.Key),
+					Val:  strings.TrimSpace(args.Value),
+					Meta: meta,
+				}
 
-					store.TTLMetricsContainer.PermanentKeys += 1
-					response = strconv.FormatBool(store.SetKv(stre, namespace, &item))
-				case "del":
-					var args struct {
-						Key string `json:"key"`
-					}
-					_ = json.Unmarshal(argsByte, &args)
-					response = strconv.FormatBool(store.DelKv(stre, strings.TrimSpace(args.Key)))
-				case "keys":
-					response = store.KeyKv(stre)
-				case "save":
-					response = commands.SaveCommand(stre)
-				case "load":
+				store.TTLMetricsContainer.PermanentKeys += 1
+				response = strconv.FormatBool(store.SetKv(stre, &item))
+			case "del":
+				var args struct {
+					Key string `json:"key"`
+				}
+				_ = json.Unmarshal(argsByte, &args)
+				response = strconv.FormatBool(store.DelKv(stre, strings.TrimSpace(args.Key)))
+			case "keys":
+				response = store.KeyKv(stre)
+			case "save":
+				response = commands.SaveCommand(stre)
+			case "load":
 
-					response = commands.LoaderCommand(stre, namespace)
-				case "get_computer_usage":
-					response = marshalMonitorResult(metrics.GetComputerUsage())
-				case "get_cpu_usage":
-					response = metrics.GetCPUUsage()
-				case "get_ram_usage":
-					response = marshalMonitorResult(metrics.GetRAMUsage())
-				case "get_disk_usage":
-					var args struct {
-						Path string `json:"path"`
-					}
-					_ = json.Unmarshal(argsByte, &args)
+				response = commands.LoaderCommand(stre)
+			case "get_computer_usage":
+				response = marshalMonitorResult(metrics.GetComputerUsage())
+			case "get_cpu_usage":
+				response = metrics.GetCPUUsage()
+			case "get_ram_usage":
+				response = marshalMonitorResult(metrics.GetRAMUsage())
+			case "get_disk_usage":
+				var args struct {
+					Path string `json:"path"`
+				}
+				_ = json.Unmarshal(argsByte, &args)
 
-					path := strings.TrimSpace(args.Path)
-					if path == "" {
-						path = "/"
-					}
+				path := strings.TrimSpace(args.Path)
+				if path == "" {
+					path = "/"
+				}
 
-					disk := metrics.GetDiskUsage(path)
-					if disk.Err != nil {
-						response = agents.StructuredError("disk_usage_failed", fmt.Sprintf("failed to fetch disk usage for %q: %v", path, disk.Err))
-					} else {
-						response = marshalMonitorResult(map[string]any{
-							"path":         path,
-							"total_gb":     disk.Total,
-							"free_gb":      disk.Free,
-							"available_gb": disk.Avaliable,
-						})
-					}
-				case "get_runtime_stats":
-					response = marshalMonitorResult(metrics.GetRuntimeStats())
-				case "get_server_uptime":
-					response = fmt.Sprintf("%.2f", metrics.GetServerUptime())
-				case "get_connected_clients":
-					response = marshalMonitorResult(metrics.GetConnectedClients())
-				case "get_command_count":
-					response = fmt.Sprintf("%d", metrics.GetCommandCount())
-				case "get_all_topics_online":
-					response = marshalPubSubResult(metrics.GetAllTopicsOnline(user))
-				case "get_all_subscribers":
-					response = marshalPubSubResult(metrics.GetAllSubscribers(user))
-				case "get_all_publishers":
-					response = marshalPubSubResult(metrics.GetAllPublisher(user))
-				case "get_publishers":
-					response = marshalPubSubResult(metrics.GetPublishers(user, parseTopic(argsByte)))
-				case "get_subscribers":
-					response = marshalPubSubResult(metrics.GetSubscribers(user, parseTopic(argsByte)))
-				case "get_topic_statistics":
-					response = marshalPubSubResult(metrics.GetTopicStatistics(user, parseTopic(argsByte)))
-				case "get_inactive_topics":
-					response = marshalPubSubResult(metrics.GetInactiveTopics(user))
-				case "broadcast_to_topic":
-					topic, message := parseTopicMessage(argsByte)
-					response = marshalPubSubResult(metrics.BroadcastToTopic(user, topic, message))
-				case "broadcast_everywhere":
-					response = marshalPubSubResult(metrics.BroadcastEverywhere(user, parseMessage(argsByte)))
-				case "history_of_topic":
-					response = marshalPubSubResult(metrics.HistoryOfTopic(user, parseTopic(argsByte)))
-				case "delete_topic":
-					response = marshalPubSubResult(metrics.DeleteTopic(user, parseTopic(argsByte)))
-				case "create_topic":
-					response = marshalPubSubResult(metrics.CreateTopic(user, parseTopic(argsByte)))
-				case "remove_user":
-					portAddress, reason := parseRemoveUserArgs(argsByte)
-					response = marshalPubSubResult(metrics.RemoveUser(user, portAddress, reason))
-				case "get_total_keys":
-					response = metrics.GetTotalKeys(stre, namespace)
-				case "get_largest_keys":
-					response = metrics.GetLargestKeys(stre, namespace, parseTopN(argsByte))
-				case "get_smallest_keys":
-					response = metrics.GetSmallestKeys(stre, namespace, parseTopN(argsByte))
-				case "get_average_value_size":
-					response = metrics.GetAverageValueSize(stre, namespace)
-				case "get_namespaces":
-					response = metrics.GetNamespaces(stre, namespace)
-				case "get_ttl_metrics":
-					response = metrics.GetTTLMetrics()
-				case "get_expired_keys":
-					response = metrics.GetExpiredKeys(stre)
-				case "get_upcoming_expirations":
-					response = metrics.GetUpcomingExpirations(stre, parseTopN(argsByte))
-				case "get_keys_without_ttl":
-					response = metrics.GetKeysWithoutTTL(stre)
-				case "get_snapshot_count":
-					response = metrics.GetSnapshotCount()
-				case "get_latest_snapshot":
-					response = metrics.GetLatestSnapshot()
-				case "get_snapshot_size":
-					response = metrics.GetSnapshotSize()
-				case "get_persistence_health":
-					response = metrics.GetPersistenceHealth()
-				case "get_oldest_key":
-					response = summarizeKeyMetadata(metrics.GetOldestKey(stre))
-				case "get_newest_key":
-					response = summarizeKeyMetadata(metrics.GetNewestKey(stre))
-				case "get_most_accessed_key":
-					response = summarizeKeyMetadata(metrics.GetMostAccessedKey(stre))
-				case "get_least_accessed_key":
-					response = summarizeKeyMetadata(metrics.GetLeastAccessedKey(stre))
-				case "get_recently_modified_keys":
-					response = summarizeKeyMetadataSlice(metrics.GetRecentlyModifiedKeys(stre, parseTopN(argsByte)))
-											
+				disk := metrics.GetDiskUsage(path)
+				if disk.Err != nil {
+					response = agents.StructuredError("disk_usage_failed", fmt.Sprintf("failed to fetch disk usage for %q: %v", path, disk.Err))
+				} else {
+					response = marshalMonitorResult(map[string]any{
+						"path":         path,
+						"total_gb":     disk.Total,
+						"free_gb":      disk.Free,
+						"available_gb": disk.Avaliable,
+					})
+				}
+			case "get_runtime_stats":
+				response = marshalMonitorResult(metrics.GetRuntimeStats())
+			case "get_server_uptime":
+				response = fmt.Sprintf("%.2f", metrics.GetServerUptime())
+			case "get_connected_clients":
+				response = marshalMonitorResult(metrics.GetConnectedClients())
+			case "get_command_count":
+				response = fmt.Sprintf("%d", metrics.GetCommandCount())
+			case "get_all_topics_online":
+				response = marshalPubSubResult(metrics.GetAllTopicsOnline(user))
+			case "get_all_subscribers":
+				response = marshalPubSubResult(metrics.GetAllSubscribers(user))
+			case "get_all_publishers":
+				response = marshalPubSubResult(metrics.GetAllPublisher(user))
+			case "get_publishers":
+				response = marshalPubSubResult(metrics.GetPublishers(user, parseTopic(argsByte)))
+			case "get_subscribers":
+				response = marshalPubSubResult(metrics.GetSubscribers(user, parseTopic(argsByte)))
+			case "get_topic_statistics":
+				response = marshalPubSubResult(metrics.GetTopicStatistics(user, parseTopic(argsByte)))
+			case "get_inactive_topics":
+				response = marshalPubSubResult(metrics.GetInactiveTopics(user))
+			case "broadcast_to_topic":
+				topic, message := parseTopicMessage(argsByte)
+				response = marshalPubSubResult(metrics.BroadcastToTopic(user, topic, message))
+			case "broadcast_everywhere":
+				response = marshalPubSubResult(metrics.BroadcastEverywhere(user, parseMessage(argsByte)))
+			case "history_of_topic":
+				response = marshalPubSubResult(metrics.HistoryOfTopic(user, parseTopic(argsByte)))
+			case "delete_topic":
+				response = marshalPubSubResult(metrics.DeleteTopic(user, parseTopic(argsByte)))
+			case "create_topic":
+				response = marshalPubSubResult(metrics.CreateTopic(user, parseTopic(argsByte)))
+			case "remove_user":
+				portAddress, reason := parseRemoveUserArgs(argsByte)
+				response = marshalPubSubResult(metrics.RemoveUser(user, portAddress, reason))
+			case "get_total_keys":
+				response = metrics.GetTotalKeys(stre)
+			case "get_largest_keys":
+				response = metrics.GetLargestKeys(stre, parseTopN(argsByte))
+			case "get_smallest_keys":
+				response = metrics.GetSmallestKeys(stre, parseTopN(argsByte))
+			case "get_average_value_size":
+				response = metrics.GetAverageValueSize(stre)
+			case "get_namespaces":
+				response = metrics.GetNamespaces(stre)
+			case "get_ttl_metrics":
+				response = metrics.GetTTLMetrics()
+			case "get_expired_keys":
+				response = metrics.GetExpiredKeys(stre)
+			case "get_upcoming_expirations":
+				response = metrics.GetUpcomingExpirations(stre, parseTopN(argsByte))
+			case "get_keys_without_ttl":
+				response = metrics.GetKeysWithoutTTL(stre)
+			case "get_snapshot_count":
+				response = metrics.GetSnapshotCount()
+			case "get_latest_snapshot":
+				response = metrics.GetLatestSnapshot()
+			case "get_snapshot_size":
+				response = metrics.GetSnapshotSize()
+			case "get_persistence_health":
+				response = metrics.GetPersistenceHealth()
+			case "get_oldest_key":
+				response = summarizeKeyMetadata(metrics.GetOldestKey(stre))
+			case "get_newest_key":
+				response = summarizeKeyMetadata(metrics.GetNewestKey(stre))
+			case "get_most_accessed_key":
+				response = summarizeKeyMetadata(metrics.GetMostAccessedKey(stre))
+			case "get_least_accessed_key":
+				response = summarizeKeyMetadata(metrics.GetLeastAccessedKey(stre))
+			case "get_recently_modified_keys":
+				response = summarizeKeyMetadataSlice(metrics.GetRecentlyModifiedKeys(stre, parseTopN(argsByte)))
 
-				default:
-						response = "No specialist response was produced."
+			default:
+				response = "No specialist response was produced."
 			}
 
 			if response == "" {
 				response = "No specialist response was produced."
 			}
-			data := fmt.Sprintf("%v",response)
+			data := fmt.Sprintf("%v", response)
 			fmt.Println("Data Appended: ", data)
-			rawReplies = append(rawReplies,data)
+			rawReplies = append(rawReplies, data)
 			specialistReplies = append(specialistReplies, fmt.Sprintf("[%s]\n%s", tool.Function.Name, response))
 		}
 		session.AppendToolResults(rawReplies...)
@@ -322,7 +319,6 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, n
 		if strings.TrimSpace(finalText) != "" {
 			return finalText
 		}
-		
 
 		return strings.Join(specialistReplies, "\n\n")
 	}
@@ -334,8 +330,6 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, n
 	return "\nroxai> I’m ready to help with the requested RoxKV task.\n"
 }
 
-
-
 func marshalMonitorResult(value any) string {
 	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
@@ -344,7 +338,6 @@ func marshalMonitorResult(value any) string {
 
 	return string(data)
 }
-
 
 func parseTopic(argsByte []byte) string {
 	var args pubsubTopicArgs
@@ -378,8 +371,6 @@ func marshalPubSubResult(value any) string {
 
 	return string(data)
 }
-
-
 
 func parseTopN(argsByte []byte) int {
 	var args toolTopNArgs

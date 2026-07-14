@@ -22,7 +22,6 @@ import (
 
 const MaxConnections = 5
 
-
 var mutex = sync.RWMutex{}
 
 func DeleteClientListing(target *utils.NewClient) {
@@ -36,7 +35,7 @@ func DeleteClientListing(target *utils.NewClient) {
 
 }
 
-func handleConnection(client *utils.NewClient, store *store.MemoryAlloc, namespace *store.NameSpace) {
+func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 	reader := bufio.NewReader(client.Conn)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -77,9 +76,11 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc, namespa
 		}
 
 		// Gets the data from type interface{}/any to string and then writes to byte
-		data := commands.ParseCommands(store, namespace, strings.Fields(input), client)
+		data := commands.ParseCommands(store, strings.Fields(input), client)
 		datastr := fmt.Sprintf("%v", data)
-		_, werr := client.Conn.Write([]byte("roxkv> " + datastr + " \n"))
+
+		_, werr := client.Conn.Write([]byte("roxkv> " + datastr + "\n"))
+		// _, werr := client.Conn.Write([]byte("+" + string(input) + "\r\n"))
 
 		if werr != nil {
 			fmt.Println("err:", werr)
@@ -89,6 +90,62 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc, namespa
 	}
 
 }
+
+func Server() {
+	agent, err := api.ClientFromEnvironment()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stre, _ := store.StoreInMemory()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	listner, err := net.Listen("tcp", ":6969")
+
+	if err != nil {
+		fmt.Println("Server is busy and not listening at port 6969:", err)
+		logger.ErrorLog("error while connecting to the TCP server, port 6969 is busy")
+		return
+	}
+	defer listner.Close()
+	utils.ServerStarted = time.Now()
+	store.StoreHelper = stre
+	go worker.SnapshotWorker(ctx, stre, &mutex, utils.TotalConnecntions)
+	fmt.Println("Listening CLI Connection at localhost:6969")
+	go ChatServer(stre, agent)
+	go WebServer()
+	go WebChatServer(stre, agent)
+	go RespServer(stre, agent)
+
+	for {
+
+		conn, err := listner.Accept()
+
+		if err != nil {
+			fmt.Println("Connection could not be established:", err)
+			logger.ErrorLog("Connection failed could not be established")
+			continue
+		}
+
+		client := *utils.CreateClient(conn, "client")
+
+		mutex.Lock()
+		if len(utils.TotalConnecntions) > MaxConnections {
+			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
+			client.Conn.Close()
+			continue
+		}
+		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
+		mutex.Unlock()
+		fmt.Println("Connected: ", client.ID)
+		go handleConnection(&client, stre)
+
+	}
+
+}
+
+// Background worker to remove inactive clients
 
 func ClearConnections(t time.Time, client *utils.NewClient) {
 	if time.Since(client.LastUsed) > (40 * time.Minute) {
@@ -114,57 +171,4 @@ func DeadOrAliveConnections(ctx context.Context, client *utils.NewClient) {
 
 		}
 	}
-}
-
-func Server() {
-	agent, err := api.ClientFromEnvironment()
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	stre, namespace := store.StoreInMemory()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	listner, err := net.Listen("tcp", ":6969")
-
-	if err != nil {
-		fmt.Println("Server is busy and not listening at port 6969:", err)
-		logger.ErrorLog("error while connecting to the TCP server, port 6969 is busy")
-		return
-	}
-	defer listner.Close()
-	utils.ServerStarted = time.Now()
-	store.StoreHelper = stre
-	go worker.SnapshotWorker(ctx, stre, &mutex, utils.TotalConnecntions)
-	fmt.Println("Listening CLI Connection at localhost:6969")
-	go ChatServer(stre, namespace,agent)
-	go WebServer()
-	go WebChatServer(stre,namespace,agent)
-
-	for {
-
-		conn, err := listner.Accept()
-
-		if err != nil {
-			fmt.Println("Connection could not be established:", err)
-			logger.ErrorLog("Connection failed could not be established")
-			continue
-		}
-
-		client := *utils.CreateClient(conn, "client")	
-		
-		mutex.Lock()
-		if len(utils.TotalConnecntions) > MaxConnections {
-			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
-			client.Conn.Close()
-			continue
-		}
-		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
-		mutex.Unlock()
-		fmt.Println("Connected: ", client.ID)
-		go handleConnection(&client, stre, namespace)
-
-	}
-
 }

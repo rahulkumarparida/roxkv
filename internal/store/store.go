@@ -129,6 +129,7 @@ func StoreInMemory() (*MemoryAlloc, *NameSpace) {
 	ns := &NameSpace{
 		Data: make(map[string]int),
 	}
+	Namespace = ns
 
 	return store, ns
 }
@@ -138,6 +139,8 @@ type NameSpace struct {
 	Mu   sync.RWMutex   `json:"-"`
 	Data map[string]int `json:"data"`
 }
+
+var Namespace *NameSpace
 
 func (ns *NameSpace) SetNameSpace(name string) {
 	ns.Mu.Lock()
@@ -160,7 +163,7 @@ func (ns *NameSpace) GetNamespace(name string) (string, int) {
 }
 
 // Uses the function from MemoryAlloc and kv Item struct to Set a variable
-func SetKv(store *MemoryAlloc, namespace *NameSpace, kv *Item) bool {
+func SetKv(store *MemoryAlloc, kv *Item) bool {
 
 	data, exist := store.Get(kv.Key)
 
@@ -215,7 +218,7 @@ func SetKv(store *MemoryAlloc, namespace *NameSpace, kv *Item) bool {
 	}
 
 	store.Set(values)
-	namespace.SetNameSpace(kv.Key)
+	Namespace.SetNameSpace(kv.Key)
 	return true
 
 }

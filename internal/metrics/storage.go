@@ -137,23 +137,19 @@ func toKeyMetadata(item store.Item) KeyMetadata {
 }
 
 // Key statistcs
-func GetTotalKeys(stre *store.MemoryAlloc, namespace *store.NameSpace) int {
-	_ = namespace
+func GetTotalKeys(stre *store.MemoryAlloc) int {
 	return len(LiveItems(stre))
 }
 
-func GetLargestKeys(stre *store.MemoryAlloc, namespace *store.NameSpace, topN int) []KeyNSize {
-	_ = namespace
+func GetLargestKeys(stre *store.MemoryAlloc, topN int) []KeyNSize {
 	return topSizedKeys(LiveItems(stre), topN, true)
 }
 
-func GetSmallestKeys(stre *store.MemoryAlloc, namespace *store.NameSpace, topN int) []KeyNSize {
-	_ = namespace
+func GetSmallestKeys(stre *store.MemoryAlloc, topN int) []KeyNSize {
 	return topSizedKeys(LiveItems(stre), topN, false)
 }
 
-func GetAverageValueSize(stre *store.MemoryAlloc, namespace *store.NameSpace) int {
-	_ = namespace
+func GetAverageValueSize(stre *store.MemoryAlloc) int {
 	items := LiveItems(stre)
 	if len(items) == 0 {
 		return 0
@@ -167,8 +163,7 @@ func GetAverageValueSize(stre *store.MemoryAlloc, namespace *store.NameSpace) in
 	return int(totalSize) / len(items)
 }
 
-func GetNamespaces(stre *store.MemoryAlloc, namespace *store.NameSpace) []KeyNSize {
-	_ = namespace
+func GetNamespaces(stre *store.MemoryAlloc) []KeyNSize {
 	items := LiveItems(stre)
 	if len(items) == 0 {
 		return []KeyNSize{}
@@ -301,11 +296,10 @@ func GetSnapshotSize() int64 {
 	return totalSize
 }
 
-
-func NextSnapshotTime() float64 {	
+func NextSnapshotTime() float64 {
 
 	data := GetLatestSnapshot()
-	
+
 	// fmt.Println("Data:", data)
 	timeleft := time.Until(data.ModifiedAt)
 	if timeleft > 0 {

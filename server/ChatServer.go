@@ -16,7 +16,7 @@ import (
 
 var cmutex = sync.Mutex{}
 
-func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, namespace *store.NameSpace, agent *api.Client) {
+func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, agent *api.Client) {
 
 	reader := bufio.NewReader(user.Conn)
 
@@ -47,16 +47,16 @@ func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, namesp
 		}
 
 		// Route all requests through the master orchestrator so specialist-agent results are collected and summarized centrally.
-		data := master.MasterAgent(input, stre, user, namespace, agent)
+		data := master.MasterAgent(input, stre, user, agent)
 
-		dataString := fmt.Sprintf("%v",data)
-		user.Conn.Write([]byte("\nroxai> "+dataString+"\n"))
+		dataString := fmt.Sprintf("%v", data)
+		user.Conn.Write([]byte("\nroxai> " + dataString + "\n"))
 	}
 
 }
 
-func ChatServer(stre *store.MemoryAlloc, namespace *store.NameSpace, agent *api.Client) {
-	
+func ChatServer(stre *store.MemoryAlloc, agent *api.Client) {
+
 	listner, err := net.Listen("tcp", ":6970")
 
 	if err != nil {
@@ -88,7 +88,7 @@ func ChatServer(stre *store.MemoryAlloc, namespace *store.NameSpace, agent *api.
 		cmutex.Unlock()
 
 		fmt.Println("Connected: ", client.ID)
-		go handleChatConnection(&client, stre, namespace, agent)
+		go handleChatConnection(&client, stre, agent)
 
 	}
 

@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -36,7 +35,6 @@ func TakeSnapShot(ms *store.MemoryAlloc, snaptime time.Time, clientsconnected []
 
 	for _, key := range keys {
 		data := store.GetKv(ms, key)
-		fmt.Println("Keys:", data)
 		kvdata = append(kvdata, data)
 	}
 
@@ -68,9 +66,7 @@ func SnapshotWorker(ctx context.Context, ms *store.MemoryAlloc, mu *sync.RWMutex
 			clientCopy := make([]*utils.NewClient, len(clients))
 			copy(clientCopy, clients)
 			mu.Unlock()
-
 			TakeSnapShot(ms, t, clientCopy)
-			fmt.Println("Taken Snapss----------------->")
 		}
 
 	}
