@@ -22,7 +22,7 @@ func RespServer(stre *store.MemoryAlloc, agent *api.Client) {
 	}
 	defer listner.Close()
 
-	fmt.Println("Resp-Server Listening at localhost:6973")
+	fmt.Println("Listening Resp-Server at localhost:6973")
 
 	for {
 

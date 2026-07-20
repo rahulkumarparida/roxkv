@@ -6,7 +6,7 @@ persistence, TTL support, Pub/Sub messaging, and history logging.
 
 SYNOPSIS
 set <key> <value...>
-set <key> <value...> --ttl <number> <sec|min|hr>
+set <--ttl <number> <sec|min|hr>|""> <key> <value...> 
 
 ```
    get <key>

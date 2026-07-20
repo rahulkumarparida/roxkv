@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/logger"
@@ -11,9 +12,8 @@ import (
 
 func RemoveExpired(t time.Time,ms *store.MemoryAlloc){
 	ms.Mu.Lock()
-	defer ms.Mu.Unlock()
-
 	vals := ms.Data
+	ms.Mu.Unlock()	
 
 
 	if len(vals) == 0 {
@@ -24,8 +24,22 @@ func RemoveExpired(t time.Time,ms *store.MemoryAlloc){
 		if !key.Meta.TTL.IsZero() && key.Meta.TTL.Before(time.Now()) {
 			logger.InfoLog("Removed "+key.Key+" it expired.")
 			store.DelKv(ms , key.Key)
+			
 			store.TTLMetricsContainer.TotalExpiredKeys +=1
 			store.TTLMetricsContainer.ExpiresToday += 1
+			var index int
+			for idx , ele := range store.TTLMetricsContainer.NextExpiringKeys{
+				if ele.Key == key.Key {
+					index = idx	
+					break
+				}
+			}
+
+			store.TTLMetricsContainer.NextExpiringKeys = slices.Delete(store.TTLMetricsContainer.NextExpiringKeys,index,index)
+
+			
+
+
 			logger.InfoLog("Ticker worked at : "+ t.Format("2006-01-02 15:04:05")) 
 		}
 	}

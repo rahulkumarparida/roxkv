@@ -16,6 +16,10 @@ var ServerStarted time.Time
 var TotalConnecntions []*NewClient
 
 type Role string
+type Mode struct {
+	Name string
+	Topic []string
+}
 
 const (
 	RoleSystem Role = "system"
@@ -23,6 +27,15 @@ const (
 	RoleAdmin  Role = "admin"
 )
 
+var ModeDefault = Mode{
+	Name: "default",
+	Topic: nil,
+}
+
+var ModeSubsriber = Mode{
+	Name: "subscriber",
+	Topic: []string{},
+}
 type NewClient struct {
 	ID           any          `json:"id"`
 	Role         string       `json:"role"`
@@ -31,6 +44,7 @@ type NewClient struct {
 	ConnectedAt  time.Time    `json:"connectedAt"`
 	Mu           sync.RWMutex `json:"-"`
 	Interactions int          `json:"interactions"`
+	Mode 		 Mode		  `json:"mode"`
 }
 
 type ClientMetaData struct {
@@ -54,6 +68,7 @@ func CreateClient(conn net.Conn, role string) *NewClient {
 		ConnectedAt:  time.Now(),
 		Mu:           sync.RWMutex{},
 		Interactions: 1,
+		Mode: ModeDefault,
 	}
 }
 

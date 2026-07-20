@@ -269,9 +269,9 @@ func GetClients(client *utils.NewClient, topic *SubrChannel, category string) []
 
 func GetAllMembers(client *utils.NewClient, subOrPub string) []*utils.NewClient {
 
-	// if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
-	// 	return []*utils.NewClient{}
-	// }
+	if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
+		return []*utils.NewClient{}
+	}
 	logger.InfoLog(" " + client.Role + " : Invoked all the members of all the topics")
 
 	Helper.Mu.Lock()

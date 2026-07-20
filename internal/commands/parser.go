@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +28,7 @@ func ParseCommands(store *store.MemoryAlloc, input []string, client *utils.NewCl
 	switch input[0] {
 	case "GET", "get", "Get":
 		val := GetCommand(store, data)
-		fmt.Println(val)
+		// fmt.Println(val)
 		return val
 	case "SET", "set", "Set":
 		val := SetCommand(client, store, data)
@@ -163,8 +162,6 @@ func evaluatetime(ttl int, dur string) time.Time {
 
 func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string) bool {
 	var dataItems store.Item
-	var inpData []string
-	var stripTtl []string
 
 	if len(data[1:]) <= 0 {
 		logger.ErrorLog("Provided empty value in the key value pair")
@@ -173,23 +170,24 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string)
 
 	}
 
-	if slices.Contains(data, "--ttl") {
-		sliceFrom := slices.Index(data, "--ttl")
-		stripTtl = data[sliceFrom+1:]
-		if len(stripTtl) > 2 || stripTtl[0] == "" || stripTtl[1] == "" {
+	if data[0] == "--ttl" {
+		ttlVals := data[1:3]
+		dataVals := data[3:]
+		
+		if len(ttlVals) > 2 || ttlVals[0] == "" || ttlVals[1] == "" {
 			logger.ErrorLog("2 Args after the --ttl flag")
 			fmt.Println("2 args after --ttl")
 			return false
 		}
-		value := ParseInput(data[1 : sliceFrom-1])
+		value := dataVals[1:]
 		sizeOfValue := len(value)
-		var timetoAdd, err = strconv.Atoi(stripTtl[0]) // time like 12 ,13 ,14
+		var timetoAdd, err = strconv.Atoi(ttlVals[0]) // time like 12 ,13 ,14
 
 		if utils.HandleError("Error while parsing time provided", err) {
 			logger.ErrorLog("Parsing failed while parsing the time. Integre required")
 			return false
 		}
-		futuretime := evaluatetime(timetoAdd, stripTtl[1])
+		futuretime := evaluatetime(timetoAdd, ttlVals[1])
 
 		meta := store.Metadata{
 			TTL:           futuretime,
@@ -199,7 +197,7 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string)
 		}
 
 		dataItems = store.Item{
-			Key:  data[0],
+			Key:  dataVals[0],
 			Val:  value,
 			Meta: meta,
 		}
@@ -209,22 +207,17 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string)
 		}
 
 		store.TTLMetricsContainer.ActiveTTLKeys += 1
-		store.TTLMetricsContainer.NextExpiringKeys = append(store.TTLMetricsContainer.NextExpiringKeys, store.TTLInfo{
-			Key:       data[0],
-			ExpiresIn: time.Until(futuretime),
-		})
+		
 
 	} else {
-		inpData = data[1:]
-		stripTtl = []string{"", ""}
-		value := ParseInput(inpData)
+		value := ParseInput(data[1:])
 		sizeOfValue := len(value)
 		store.TTLMetricsContainer.PermanentKeys += 1
 		meta := store.Metadata{
 			TTL:           time.Time{},
 			UpdatedAt:     time.Now(),
 			LastAcessedBy: client,
-			Size:          int64(sizeOfValue),
+			Size:	int64(sizeOfValue),
 		}
 
 		dataItems = store.Item{
@@ -243,8 +236,12 @@ func GetCommand(stre *store.MemoryAlloc, data []string) any {
 	if len(data) != 1 {
 		fmt.Println("Check Man page")
 	}
+	// fmt.Println("Store:", stre)
 
 	dataVal := store.GetKv(stre, data[0])
+	if dataVal.Val == nil {
+		return  nil
+	}
 
 	return dataVal.Val
 }
@@ -283,7 +280,7 @@ func SaveCommand(stre *store.MemoryAlloc) string {
 	filename := time.Now().Format("2006-01-02") + ".json"
 	val := persistence.StoreToJson(dbpath, filename, allData)
 	fmt.Println("Saving: ", val)
-	logmsg := "All keys avaliable in RAM till are saved to DB"
+	logmsg := "All keys avaliable in RAM till now are saved to DB"
 	logger.SucessLog(logmsg)
 	return "Saved"
 }

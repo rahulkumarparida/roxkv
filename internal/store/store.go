@@ -120,6 +120,14 @@ func (ma *MemoryAlloc) Keys() []string {
 	return keys
 }
 
+func (ma *MemoryAlloc) Flush() bool{
+	ma.Mu.Lock()
+	ma.Data = nil
+	ma.Mu.Unlock()
+
+	return true 
+}
+
 // This one initializes the making of data returns a memory address ot type MemoryAlloc we can access all the methods belonging to MemoryAlloc
 func StoreInMemory() (*MemoryAlloc, *NameSpace) {
 
@@ -249,4 +257,9 @@ func KeyKv(store *MemoryAlloc) []string {
 	data := store.Keys()
 
 	return data
+}
+
+func FlushKv(store *MemoryAlloc) bool{
+	val := store.Flush()
+	return val
 }
