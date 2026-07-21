@@ -54,7 +54,7 @@ func CreateTopic(client *utils.NewClient, topic string) *SubrChannel {
 		UpdatedAt:     time.Now(),
 		LastPublisher: nil,
 		History:       []TopicHistory{},
-		PublishCount:  1,
+		PublishCount:  0,
 		TotalSize:     0,
 	}
 
@@ -68,6 +68,7 @@ func FindChannel(collection *AllChannels, topic string) (*SubrChannel, bool) {
 			return channel, true
 		}
 	}
+	
 
 	return nil, false
 
@@ -105,7 +106,7 @@ func HandleSubscribers(client *utils.NewClient, topic string) bool {
 func DeliverMessage(sub *utils.NewClient, msg string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	sub.Conn.Write([]byte("roxkv> " + msg + "\n"))
+	sub.Conn.Write([]byte(msg))
 
 	sub.Mu.Lock()
 	sub.LastUsed = time.Now()
@@ -140,32 +141,22 @@ func Broker(client *utils.NewClient, topic string, msg string) {
 	copy(subs, channel.Subscribers)
 	copy(pubs, channel.Publisher)
 
-	var IsPublisher bool = false
 
-	for _, pub := range pubs {
-		if client == pub {
-			IsPublisher = true
-		}
-	}
+	channel.Publisher = append(channel.Publisher, client)
 
-	if len(pubs) == 0 {
-		channel.Publisher = append(channel.Publisher, client)
-	}
-
-	if IsPublisher || client.Role == string(utils.RoleSystem) || client.Role == string(utils.RoleAdmin) {
-		for _, sub := range subs {
-
+	
+	for _, sub := range subs {
+		if sub == client {
+			continue
+		}else{
 			channel.Wg.Add(1)
-			go DeliverMessage(sub, msg, &channel.Wg)
-
-		}
-		channel.Wg.Wait()
-
-	} else {
-		client.Conn.Write([]byte("Only Publisher can publish on the channel\n"))
-		return
+			go DeliverMessage(sub, "roxkv> " +msg+"\n", &channel.Wg)
+		}	
 
 	}
+	channel.Wg.Wait()
+
+
 
 }
 
