@@ -158,17 +158,20 @@ func GetInactiveTopics(client *utils.NewClient) []TopicSnapshot {
 	}
 
 	pubsub.Helper.Mu.RLock()
-	channels := make([]*pubsub.SubrChannel, len(pubsub.Helper.Channels))
-	copy(channels, pubsub.Helper.Channels)
+	channels :=pubsub.Helper.Channels
 	pubsub.Helper.Mu.RUnlock()
+	var allChannel []*pubsub.SubrChannel
+	for	_ ,channel := range channels{
+		allChannel = append(allChannel, channel)
+	}
 
-	sort.Slice(channels, func(i, j int) bool {
-		return channels[i].CreatedAt.Before(channels[j].CreatedAt)
+	sort.Slice(allChannel, func(i, j int) bool {
+		return allChannel[i].CreatedAt.Before(allChannel[j].CreatedAt)
 	})
 
-	inactiveTopics := make([]TopicSnapshot, 0, len(channels))
-	for _, channel := range channels {
-		inactiveTopics = append(inactiveTopics, snapshotTopic(channel))
+	inactiveTopics := make([]TopicSnapshot, 0, len(allChannel))
+	for _, allChannel := range allChannel {
+		inactiveTopics = append(inactiveTopics, snapshotTopic(allChannel))
 	}
 
 	logger.InfoLog("System asked for inactive topics")

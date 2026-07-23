@@ -201,25 +201,25 @@ func DecodeOne(data []byte) (any,int,error){
 
 	switch data[0]{
 		case SIMPLESTRING:
-			fmt.Println("Simple string")
+			// fmt.Println("Simple string")
 			return readSimpleString(data)
 		case INTERGER:
-			fmt.Println("Integer")
+			// fmt.Println("Integer")
 			return readInteger(data)
 		case BULKSTRING:
-			fmt.Println("Bulk String")
+			// fmt.Println("Bulk String")
 			return readBulkString(data)
 		case ARRAY:
-			fmt.Println("Array")
+			// fmt.Println("Array")
 			return readArray(data)
 		case BOOLEAN:
-			fmt.Println("Boolean")
+			// fmt.Println("Boolean")
 			return readBoolean(data)
 		case DOUBLES:
-			fmt.Println("Double")
+			// fmt.Println("Double")
 			return readDoubles(data)
 		case ERROR:
-			fmt.Println("Error")
+			// fmt.Println("Error")
 			return simpleReadError(data)
 		default:
 			return 	nil , 0 , errors.New("Data Type Didn't match")

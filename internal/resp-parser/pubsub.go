@@ -18,8 +18,7 @@ func SubscribeHandler(args []string,client *utils.NewClient){
 		client.Conn.Write([]byte(encode))
 		return
 	}
-
-	client.Mode = utils.ModeSubsriber	
+	
 	var encode string
 	for _, arg := range args {
 		val := pubsub.HandleSubscribers(client,arg)
@@ -40,7 +39,7 @@ func SubscribeHandler(args []string,client *utils.NewClient){
 }
 
 
-func PublisheHandler(args []string,client *utils.NewClient) string{
+func PublishHandler(args []string,client *utils.NewClient) string{
 
 	if len(args) != 2  {
 		encode , _ := EncodeSimpleError("ERR wrong number of arguments for 'publish' command")
@@ -48,21 +47,18 @@ func PublisheHandler(args []string,client *utils.NewClient) string{
 	}
 		
 
-	// if client.Mode.Name == utils.ModeSubsriber.Name{
-	// 	encode , _ := EncodeSimpleError(" ERR Can't execute 'publish': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context")
-	// 	return encode
-	// }
-
 	topicname := args[0]
 	message := args[1]
-
+	
 	pubsub.Helper.Mu.Lock()
 	topic ,exist := pubsub.FindChannel(&pubsub.Helper,topicname)
-	pubsub.Helper.Mu.Unlock()
+	pubsub.Helper.Mu.Unlock()	
 
 	if !exist {
 		SubscribeHandler([]string{topicname},client)
-		topic , _ = pubsub.FindChannel(&pubsub.Helper,topicname)
+		pubsub.Helper.Mu.Lock()
+		topic ,_ = pubsub.FindChannel(&pubsub.Helper,topicname)
+		pubsub.Helper.Mu.Unlock()	
 	}
 
 	pubsub.Helper.Mu.Lock()
@@ -124,12 +120,7 @@ func UnsubscribeHandler(args []string,client *utils.NewClient){
 			client.LastUsed = time.Now()
 			client.Mu.Unlock()
 			// remove from the Helper Channel if no subscribers left
-			
-
-			pubsub.Helper.Mu.Lock()
-			pubsub.Helper.Channels = slices.Delete(pubsub.Helper.Channels,idx,idx+1)
-			pubsub.Helper.ChannelNames =slices.Delete(pubsub.Helper.ChannelNames,idx,idx+1)
-			pubsub.Helper.Mu.Unlock()
+		
 			
 			data := []any{"unsubscribe",arg,len(client.Mode.Topic)}
 			encode , _ = EncodeArray(data) 
@@ -156,7 +147,54 @@ func UnsubscribeHandler(args []string,client *utils.NewClient){
 	}
 			
 
+}
+
+
+
+// Implement  the rest of the pubsub and test only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE are allowed in this context
+// Psubcribe subscribe to all the channels matching as many chars after * but should include the rest of the string and ? a single charachter is the ? is here
+func PSubscribeHandler(args []string,client *utils.NewClient){
+	if len(args) < 1 {
+		encode , _ := EncodeSimpleError("ERR wrong number of arguments for 'psubscribe' command")
+		client.Conn.Write([]byte(encode))
+		return
+	}
+
+
+	pubsub.Helper.Mu.Lock()
+	topics := pubsub.Helper.ChannelNames
+	pubsub.Helper.Mu.Unlock()
+
+	for _, ptopic := range args {
+
+		_ , channels := PatternChecker(ptopic,topics)
+		for _, channel := range channels {
+
+			pubsub.Helper.Mu.Lock()
+				getChan := pubsub.Helper.Channels[channel]
+				if getChan == nil {
+					continue
+				}else{
+					
+					getChan.Subscribers = append(getChan.Subscribers, client)
+					getChan.PTopic = append(getChan.PTopic, ptopic)
+					getChan.UpdatedAt = time.Now()
+					client.Mode.Topic = append(client.Mode.Topic, channel)	
+					
+
+				}
+			pubsub.Helper.Mu.Unlock()
+			
+					
+		}
+
+		client.Mode.PTopic = append(client.Mode.PTopic, ptopic)
+		data := []any{"psubscribe",ptopic,len(client.Mode.PTopic)}
+		encode , _ := EncodeArray(data)
+		fmt.Println("Encoded Subscribe:",encode)
+		client.Conn.Write([]byte(encode))
+	}
+
 
 
 }
-// Implement  the rest of the pubsub and test 

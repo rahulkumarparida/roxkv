@@ -20,7 +20,7 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/worker"
 )
 
-const MaxConnections = 5
+const MaxConnections = 10
 
 var mutex = sync.RWMutex{}
 
@@ -148,7 +148,7 @@ func Server() {
 // Background worker to remove inactive clients
 
 func ClearConnections(t time.Time, client *utils.NewClient) {
-	if time.Since(client.LastUsed) > (40 * time.Minute) {
+	if time.Since(client.LastUsed) > (10 * time.Minute) {
 		fmt.Println("Client died: ", client.ID)
 		client.Conn.Write([]byte("Client was Inactive for too long \n"))
 		client.Conn.Close()

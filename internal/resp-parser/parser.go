@@ -72,6 +72,16 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 	switch strings.ToLower(input.Cmd){
 		case "ping":
 			fmt.Println("Executing ping", input.Args)
+			if client.Mode.Name == utils.ModeSubsriber.Name{
+					if len(input.Args) != 1 {
+						encode , _:= EncodeSimpleError("ERR wrong number of arguments for 'ping' command")
+						client.Conn.Write([]byte(encode))
+						return
+					}
+				encode , _:= EncodeStringArray([]string{"pong",input.Args[0]})
+				client.Conn.Write([]byte(encode))
+				return
+			}
 			val := ExecutePing(input.Args)
 			client.Conn.Write([]byte(val))
 		case "set":
@@ -149,20 +159,36 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 		case "command","docs":
 			fmt.Println("command")
 			client.Conn.Write([]byte("*0\r\n"))
-		case "subscribe","publish","unsubscribe":
+		case "subscribe","psubscribe","publish","unsubscribe":
 			
 			if input.Cmd =="subscribe" {
+				if client.Mode.Name != utils.ModeSubsriber.Name {
+					client.Mode = utils.ModeSubsriber
+				}
 				SubscribeHandler(input.Args,client)
 			}
 			if input.Cmd =="unsubscribe" {
 				UnsubscribeHandler(input.Args,client)
 			}
 			if input.Cmd =="publish"{
-					
-				data :=PublisheHandler(input.Args,client)
+				fmt.Println("Pubslihing shit:", input.Args)
+				data :=PublishHandler(input.Args,client)
 				client.Conn.Write([]byte(data))
 			}
+			if input.Cmd == "psubscribe"{
+				if client.Mode.Name != utils.ModeSubsriber.Name {
+					client.Mode = utils.ModeSubsriber
+				}
+				PSubscribeHandler(input.Args,client)
+			}
 
+		case "quit":
+			fmt.Println("executing quit")
+			ExecuteQuit(client)
+		case "reset":
+			fmt.Println("executing reset")
+			data := ExecuteReset(client)
+			client.Conn.Write([]byte(data))
 		case "monitor":
 			fmt.Println("Executing history")
 			data := ExecuteHistory(input.Args)		

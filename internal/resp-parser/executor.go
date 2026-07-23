@@ -3,16 +3,69 @@ package redisparser
 import (
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/commands"
+	"github.com/rahulkumarparida/roxkv/internal/pubsub"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
+var mutex = sync.Mutex{}
 
+
+func RemoveClientsFromTopics(client *utils.NewClient, topic string){
+	pubsub.Helper.Mu.Lock()
+	defer pubsub.Helper.Mu.Unlock()
+
+	channel, exist := pubsub.FindChannel(&pubsub.Helper, topic)
+
+	if !exist && channel == nil {
+		client.Conn.Write([]byte("Channel on the topic does not exist yet\n"))
+		return
+	}
+
+	channel.UpdatedAt = time.Now()
+	for idx, sub := range channel.Subscribers {
+		if sub == client {
+			channel.Subscribers = slices.Delete(channel.Subscribers, idx, idx+1)
+			break
+		}
+	}
+
+	for idx, pub := range channel.Publisher {
+		if pub == client {
+			channel.Publisher = slices.Delete(channel.Publisher, idx, idx+1)
+			break
+		}
+	}
+
+}
+
+func RemoveDeadClientData(client *utils.NewClient){
+	
+	// remove from TotalConnections
+	mutex.Lock()
+		utils.TotalConnecntions = slices.DeleteFunc(utils.TotalConnecntions, func(n *utils.NewClient) bool {
+			return n.ID == client.ID
+		})
+	mutex.Unlock()
+
+
+	client.Mu.Lock()
+	topics := client.Mode.Topic
+	client.Mu.Unlock()
+
+
+	for _, topic := range topics{
+		RemoveClientsFromTopics(client,topic)		
+	}
+	
+}
 
 
 func ExecuteSet(args []string, client *utils.NewClient) any{
@@ -503,14 +556,25 @@ func ExecuteStrLen(args []string)string{
 
 
 
-func ExecutePubSub(cmd string,args []string, client *utils.NewClient){
-	if strings.ToLower(cmd) == "publish" {
-		PublisheHandler(args,client)	
+
+func ExecuteQuit(client *utils.NewClient){
+	RemoveDeadClientData(client)
+
+	client.Conn.Write([]byte("+OK\r\n"))
+	client.Conn.Close()
+}
+
+func ExecuteReset(client *utils.NewClient) string{
+	client.Mu.Lock()
+	topics := client.Mode.Topic
+	client.Mu.Unlock()
+
+
+	for _, topic := range topics{
+		RemoveClientsFromTopics(client,topic)
 	}
-	if strings.ToLower(cmd) == "subscribe" {
-		SubscribeHandler(args,client)
-	}
-	if strings.ToLower(cmd) == "unsubscribe" {
-		UnsubscribeHandler(args,client)
-	}
+
+	client.Mode = utils.ModeDefault
+	return "+RESET\r\n"
+
 }

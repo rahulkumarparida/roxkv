@@ -19,6 +19,7 @@ type Role string
 type Mode struct {
 	Name string
 	Topic []string
+	PTopic []string
 }
 
 const (
@@ -30,11 +31,13 @@ const (
 var ModeDefault = Mode{
 	Name: "default",
 	Topic: nil,
+	PTopic: nil,
 }
 
 var ModeSubsriber = Mode{
 	Name: "subscriber",
 	Topic: []string{},
+	PTopic: []string{},
 }
 type NewClient struct {
 	ID           any          `json:"id"`
