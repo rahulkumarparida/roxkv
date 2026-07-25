@@ -51,7 +51,9 @@ func ReadAndHandleConnection(client *utils.NewClient) {
 
 
 func parseCommand(input *RedisInput, client *utils.NewClient) {
-
+	if PatternRegister == nil{
+		PatternRegister = make(map[string]PatternRegistry)
+	}
 
 	subscriberModeCommands :=[]string{"subscribe","ping","unsubscribe","psubscribe","punsubscribe","quit","reset"}
 
@@ -159,7 +161,7 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 		case "command","docs":
 			fmt.Println("command")
 			client.Conn.Write([]byte("*0\r\n"))
-		case "subscribe","psubscribe","publish","unsubscribe":
+		case "subscribe","psubscribe","publish","unsubscribe","punsubscribe":
 			
 			if input.Cmd =="subscribe" {
 				if client.Mode.Name != utils.ModeSubsriber.Name {
@@ -180,6 +182,10 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 					client.Mode = utils.ModeSubsriber
 				}
 				PSubscribeHandler(input.Args,client)
+			}
+
+			if input.Cmd == "punsubscribe" {
+				PUnsubscribeHandler(input.Args,client)
 			}
 
 		case "quit":

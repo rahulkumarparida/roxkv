@@ -60,9 +60,10 @@ func EncodeBulkString(data string) (string,error){
 
 // *<no-of-elemnets>\r\n$4\r\nrahu\r\n
 func EncodeArray[T any](data []T) (string , error){
-
+   
 	length := len(data)
 	var NewData string 
+	fmt.Println("Writinf to user:", length)
 	for idx := range length {
 		b := data[idx]
 		var encode string	
@@ -81,6 +82,7 @@ func EncodeArray[T any](data []T) (string , error){
 				}
 
 			case int,int64:
+				fmt.Println("Converstion int ")
 				val , err := strconv.ParseInt(fmt.Sprintf("%v",b),10,64)
 				if err != nil {
 					encode , _ = EncodeSimpleError("ERR parsing the argument")
@@ -93,10 +95,12 @@ func EncodeArray[T any](data []T) (string , error){
 			}
 			
 		NewData += encode 	
+		fmt.Println("New Data:",NewData)
 		encode = ""
 	}
 
 	encode := fmt.Sprintf("*%v\r\n%s",length,NewData)
+	
 
 	return encode , nil
 }

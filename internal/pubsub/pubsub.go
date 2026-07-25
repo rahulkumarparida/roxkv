@@ -20,7 +20,7 @@ type SubrChannel struct {
 	Subscribers   []*utils.NewClient `json:"subscribers"`
 	Publisher     []*utils.NewClient `json:"publisher"`
 	Topic         string             `json:"topic"`
-	PTopic 		  []string			 `json:"ptopic"`
+	PTopic 		  map[string]string			 `json:"ptopic"`
 	SubscribeChan chan string        `json:"-"`
 	Wg            sync.WaitGroup     `json:"-"`
 	Mu            sync.RWMutex       `json:"-"`
@@ -51,6 +51,7 @@ func CreateTopic(client *utils.NewClient, topic string) *SubrChannel {
 		Subscribers:   []*utils.NewClient{},
 		Publisher:     publisher,
 		Topic:         topic,
+		PTopic: 	   map[string]string{},	
 		SubscribeChan: make(chan string, 100),
 		Wg:            sync.WaitGroup{},
 		Mu:            sync.RWMutex{},
@@ -99,7 +100,7 @@ func GetChannel(client *utils.NewClient, topic string) *SubrChannel {
 	return channel
 }
 
-func HandleSubscribers(client *utils.NewClient, topic string) bool {
+func HandleSubscribers(client *utils.NewClient, topic string) *SubrChannel {
 	channel := GetChannel(client, topic)
 
 	channel.Mu.Lock()
@@ -107,7 +108,7 @@ func HandleSubscribers(client *utils.NewClient, topic string) bool {
 	channel.Subscribers = append(channel.Subscribers, client)
 	channel.Mu.Unlock()
 
-	return true
+	return channel
 }
 
 func DeliverMessage(sub *utils.NewClient, msg string, wg *sync.WaitGroup) {

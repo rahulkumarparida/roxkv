@@ -1,19 +1,37 @@
 package redisparser
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/rahulkumarparida/roxkv/internal/pubsub"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
 
-type PatternRegistry struct {
-	Pattern string // hello.* now.? g[^e]me
-	ListOfAvaliableChannels []string
-	clients []utils.NewClient
+type PatternRegistry struct{
+	Pattern string
+	Clients []*utils.NewClient
+
 }
+var PatternRegister map[string]PatternRegistry
 
+//  Takes the Published channelname and returns all the pattern matched to the channel
+func PtopicChecker(topic *pubsub.SubrChannel) ([]string,bool){
+	
+	var data []string		
+		
 
+	for _, item := range PatternRegister{
+		if count , _ :=PatternChecker(item.Pattern,[]string{topic.Topic}); count >= 1{
+			fmt.Println("Matched: ", item.Pattern)
+			data = append(data, item.Pattern)
+		}
+	}
+
+	
+	return data, true
+}
 
 
 func PatternChecker(input string, topics []string) (int,[]string){
