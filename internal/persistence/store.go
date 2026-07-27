@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
@@ -184,4 +185,24 @@ func LoadJsons(dbFolder string, ms *store.MemoryAlloc) int {
 	}
 
 	return count
+}
+
+
+func LastSavedFileTimeStamp() time.Time{
+	dbFolder := utils.DbFolder()
+	allFiles, err := os.ReadDir(dbFolder)
+
+	if utils.HandleError("Error while reading the files:", err) {
+		return time.Time{}
+	}
+
+	var sortedFiles = sortFile(allFiles)
+	latestFile := sortedFiles[len(sortedFiles)-1] 
+	infoI, err := latestFile.Info()
+
+		if utils.HandleError("Error reading file info", err) {
+			return time.Time{}
+		}
+
+	return infoI.ModTime()
 }

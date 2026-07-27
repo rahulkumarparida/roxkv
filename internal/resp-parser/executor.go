@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/commands"
+	"github.com/rahulkumarparida/roxkv/internal/persistence"
 	"github.com/rahulkumarparida/roxkv/internal/pubsub"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -576,5 +577,17 @@ func ExecuteReset(client *utils.NewClient) string{
 
 	client.Mode = utils.ModeDefault
 	return "+RESET\r\n"
+
+}
+
+
+
+func ExecuteLastSave() string{
+
+	timsstamp := persistence.LastSavedFileTimeStamp()
+
+	encode ,_ := EncodeInteger(timsstamp.Unix())
+
+	return encode
 
 }

@@ -195,6 +195,10 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 			fmt.Println("executing reset")
 			data := ExecuteReset(client)
 			client.Conn.Write([]byte(data))
+		case "lastsave":
+			fmt.Println("Executing LastSave")
+			data := ExecuteLastSave()
+			client.Conn.Write([]byte(data))
 		case "monitor":
 			fmt.Println("Executing history")
 			data := ExecuteHistory(input.Args)		
@@ -202,8 +206,8 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 				data , _ := EncodeBulkString(line)
 				time.Sleep(2*time.Second)
 				client.Conn.Write([]byte(data))
-
 			}
+
 		default:
 			fmt.Println("None Command found")
 			client.Conn.Write([]byte("-No such command found\r\n"))
