@@ -12,7 +12,7 @@ export const hero = {
   titleLine2: 'Not Its Commands.',
   subtitle:
     'RoxAI is an intelligent orchestration layer built on top of RoxKV that enables natural language interaction with a custom in-memory database using AI-powered tool execution.',
-  primaryCta: { label: 'Watch Demo', href: '#demo' },
+  primaryCta: { label: 'Watch Demo', href: 'https://youtu.be/pscPMhkcZQg?si=7TXA0KQUJfyAoS_T' },
   secondaryCta: { label: 'View GitHub', href: 'https://github.com/rahulkumarparida/roxkv' },
 };
 
@@ -247,14 +247,16 @@ export const footer = {
     ],
   },
   copyright: `© ${new Date().getFullYear()} RoxAI. All rights reserved.`,
-  madeWith: 'Made with Go + React + AI',
+  madeWith: 'Made with 🫶 Go + React + AI',
+  madeBy: 'Made by rahulkumarparida 🖤'
 };
 
 // ─── Navigation ─────────────────────────────────────────────────────────────
 export const navigation = [
-  { label: 'Features', href: '#capabilities' },
-  { label: 'Architecture', href: '#architecture' },
-  { label: 'Tech Stack', href: '#tech-stack' },
-  { label: 'Demo', href: '#demo' },
-  { label: 'Run Locally', href: '#run-locally' },
+  { label: 'Features', href: '/#capabilities' },
+  { label: 'Architecture', href: '/#architecture' },
+  { label: 'Tech Stack', href: '/#tech-stack' },
+  { label: 'Demo', href: '/#demo' },
+  { label: 'Run Locally', href: '/#run-locally' },
+  { label: 'Resp Docs', href: '/docs' },
 ];

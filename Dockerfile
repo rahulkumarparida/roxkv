@@ -1,30 +1,49 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
 
-FROM golang:1.26-alpine AS base
+# ─── Stage 1: Build the Go binary ────────────────────────────────────────────
+FROM golang:1.24-alpine AS builder
+
 WORKDIR /app
-RUN apk add --no-cache ca-certificates git wget
+
+# Install git for module fetching (some modules need it)
+RUN apk add --no-cache git
+
+# Cache dependency downloads
 COPY go.mod go.sum ./
 RUN go mod download
 
-FROM base AS development
+# Copy source and build a statically-linked binary
 COPY . .
-COPY scripts/backend-entrypoint.sh /usr/local/bin/backend-entrypoint.sh
-RUN chmod +x /usr/local/bin/backend-entrypoint.sh
-EXPOSE 6969 6970 6971 6972
-ENTRYPOINT ["backend-entrypoint.sh"]
-CMD ["go", "run", "./cmd/roxkv", "roxkv-tcp"]
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/roxkv ./cmd/roxkv
 
-FROM base AS build
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/roxkv ./cmd/roxkv
+# ─── Stage 2: Minimal runtime image ─────────────────────────────────────────
+FROM alpine:3.21
 
-FROM alpine:3.22 AS production
 WORKDIR /app
+
+# wget is needed for HEALTHCHECK; ca-certificates for HTTPS (Ollama API)
 RUN apk add --no-cache ca-certificates wget
-COPY --from=build /out/roxkv /usr/local/bin/roxkv
+
+# Copy the compiled binary
+COPY --from=builder /out/roxkv /usr/local/bin/roxkv
+
+# Copy the entrypoint that creates persistence directories
 COPY scripts/backend-entrypoint.sh /usr/local/bin/backend-entrypoint.sh
 RUN chmod +x /usr/local/bin/backend-entrypoint.sh
-EXPOSE 6969 6970 6971 6972
-HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=5 CMD wget -qO- http://127.0.0.1:6971/healthz >/dev/null && wget -qO- http://127.0.0.1:6972/healthz >/dev/null || exit 1
+
+# RoxKV exposes 5 servers:
+#   6969 — Native CLI TCP
+#   6970 — AI Chat TCP
+#   6971 — HTTP / SSE API
+#   6972 — AI Chat HTTP
+#   6973 — RESP-compatible TCP (redis-cli)
+EXPOSE 6969 6970 6971 6972 6973
+
+# Health check: both HTTP servers must respond
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+  CMD wget -qO- http://127.0.0.1:6971/healthz >/dev/null && \
+      wget -qO- http://127.0.0.1:6972/healthz >/dev/null || exit 1
+
+# The entrypoint creates ~/.roxkv/* directories then exec's the CMD
 ENTRYPOINT ["backend-entrypoint.sh"]
 CMD ["roxkv", "roxkv-tcp"]

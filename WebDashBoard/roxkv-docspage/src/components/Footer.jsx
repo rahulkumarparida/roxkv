@@ -15,7 +15,7 @@ export default function Footer() {
             </div>
             <p className="text-sm text-[#9898ab] mt-3">{footer.tagline}</p>
             <div className="text-xs text-[#5e5e73] mt-4 flex items-center gap-1">
-              <Heart className="w-3 h-3 text-purple-400" /> {footer.madeWith}
+              <Heart className="w-3 h-3 text-purple-400" /> {footer.madeBy}
             </div>
           </div>
           

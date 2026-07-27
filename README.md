@@ -1,387 +1,373 @@
-# RoxAI + RoxKV
+# RoxKV
 
-RoxAI and RoxKV constitute an AI-powered operational interface built on top of a custom, highly concurrent in-memory key-value database. Designed from the ground up in Go, the system integrates a robust storage engine with a sophisticated orchestration layer. It bridges the gap between low-level database operations and high-level natural language intent, providing a seamless control plane for both infrastructure management and data interaction.
+RoxKV is a custom in-memory key-value database built from scratch in Go. It implements the Redis Serialization Protocol (RESP) and exposes a TCP server that accepts connections from any standard Redis client — including `redis-cli`. Alongside the core database engine, the project ships **RoxAI**: an AI orchestration layer that allows natural language interaction with the database via a local Ollama model.
 
-The project exists to solve a fundamental friction point in infrastructure management. Traditional databases require operators to memorize specific command syntaxes, manually inspect telemetry data, switch context across disparate dashboards, and possess deep internal knowledge of the system architecture to diagnose issues. This paradigm relies heavily on manual querying and operational cognitive load.
-
-This project serves as a practical exploration of whether natural language can act as a reliable, deterministic operational interface for infrastructure. Instead of replacing the underlying infrastructure, RoxAI sits explicitly on top of RoxKV. It leverages semantic tool routing to translate natural language into deterministic database commands, telemetry queries, and administrative actions, effectively decoupling the operator's intent from the underlying system implementation.
+The project was built as an educational systems programming exercise — a deep dive into TCP servers, concurrent data structures, binary protocol parsing, publish/subscribe messaging, and persistence strategies in Go.
 
 ---
 
-## Project Status
+## What is Implemented Today
 
-RoxAI + RoxKV was developed as part of the AMD Developer Hackathon.
-
-The project demonstrates how a custom in-memory database can be combined with AI-powered tool orchestration to create an intelligent operational interface. The current implementation is a functional prototype showcasing storage, networking, monitoring, AI tool orchestration, and a real-time dashboard.
-
-Future development will focus on Redis protocol compatibility, distributed storage, vector search, authentication, and more advanced AI planning capabilities.
-
----
-
-# Evolution of the Project
-
-The architecture developed iteratively, evolving from a raw storage engine into a comprehensive, AI-orchestrated infrastructure platform.
-
-### Phase 1: RoxKV
-The project originated as RoxKV, a custom in-memory key-value database written entirely from scratch in Go. The goal was to build a robust foundation capable of handling high-throughput concurrent workloads without relying on external storage dependencies.
-*   **Storage Engine**: Designed around an in-memory hash map for O(1) average time complexity lookups.
-*   **Mutexes and Concurrent Access**: Implemented read-write locks (`sync.RWMutex`) to guarantee thread safety while maximizing read throughput across concurrent routines.
-*   **CRUD Operations**: Standardized Create, Read, Update, and Delete operations for base data manipulation.
-*   **TCP Networking**: Adopted a custom TCP server to handle low-level packet transmission, ensuring minimal overhead compared to HTTP for raw database commands.
-*   **Multiple Clients**: Built connection handlers to manage concurrent client sessions interacting with the shared memory space.
-*   **Persistence and Snapshots**: Added disk-backed snapshotting to serialize the memory state, ensuring data durability across system restarts.
-*   **TTL (Time-To-Live)**: Implemented background expiration logic to automatically purge stale keys, managing memory lifecycle.
-*   **Workers**: Utilized background goroutines to handle periodic tasks like snapshotting and TTL eviction without blocking the main event loop.
-*   **Parser and Command Execution**: Developed a custom command parser to interpret raw TCP payloads into executable database functions.
-
-### Phase 2: Networking
-To facilitate communication between the storage engine and external actors, a robust networking layer was established.
-TCP was selected over HTTP to minimize protocol overhead, reduce latency, and provide a continuous, stateful connection for database clients. Multiple clients communicate with the shared memory pool through independent goroutines spawned per connection, with synchronization handled at the storage layer via mutexes.
-The client lifecycle is strictly managed: connections are registered upon successful handshake, monitored for activity, and aggressively cleaned up during inactive periods or abrupt disconnections to prevent file descriptor leaks. Building this custom TCP layer provided critical insights into distributed systems, byte-level data serialization, socket programming, and connection multiplexing.
-
-### Phase 3: Pub/Sub
-To evolve RoxKV from a static storage engine into a dynamic messaging system, a Publish/Subscribe (Pub/Sub) model was introduced.
-This paradigm was added to support event-driven architectures, allowing clients to react to data changes asynchronously.
-*   **Topics**: Logical channels where messages are broadcasted.
-*   **Publishers**: Clients that push payloads to specific topics.
-*   **Subscribers**: Clients listening to topics for real-time updates.
-*   **Broadcasting and Concurrent Messaging**: Handled via Go channels, enabling non-blocking, concurrent message delivery to all active subscribers.
-*   **Real-Time Communication**: Enables immediate notification propagation, bypassing the need for aggressive client-side polling.
-
-This capability elevated RoxKV beyond a simple key-value store, positioning it as a lightweight message broker capable of real-time event streaming.
-
-### Phase 4: Monitoring Layer
-As the system complexity grew, visibility into internal state became critical, necessitating a dedicated monitoring subsystem.
-This layer continuously tracks:
-*   **CPU, RAM, and Disk Usage**: Host-level resource utilization.
-*   **Go Runtime Metrics**: Goroutine counts, garbage collection statistics, and heap allocations.
-*   **Client Statistics**: Active connections and connection churn.
-*   **Server Uptime and Storage Statistics**: Total keys, memory fragmentation, and database capacity.
-*   **Snapshots and TTL Statistics**: Frequency of persistence events and expiration rates.
-*   **Command Count**: Throughput metrics (operations per second).
-
-Crucially, these metrics were not designed solely for human consumption; they form the foundational data structures that act as executable tools for the AI layer in subsequent phases.
-
-### Phase 5: Storage Intelligence
-Building upon the raw metrics, a storage analysis layer was developed to provide semantic meaning to the telemetry data.
-This module performs deep inspections of the data state:
-*   **Storage and Snapshot Health**: Validating data integrity and backup recency.
-*   **TTL Analysis**: Profiling keys approaching expiration.
-*   **Metadata**: Extracting structural information without reading full values.
-*   **Key Profiling**: Identifying the oldest, newest, and largest keys to diagnose memory bloat.
-*   **Namespaces and Persistence Analysis**: Grouping logical datasets and evaluating write-ahead patterns.
-*   **Health Reports**: Aggregating subsystem states into comprehensive diagnostic summaries.
-
-This intelligence transforms raw bytes and counts into actionable operational insights, allowing for automated capacity planning and anomaly detection.
-
-### Phase 6: AI Layer
-The introduction of RoxAI shifted the interaction paradigm. RoxAI is strictly an orchestration layer, not a conversational chatbot. It interprets intent and maps it to deterministic system actions.
-
-**Architecture Flow:**
-`User → Master Agent → Semantic Tool Router → Relevant Tools → Execution → Structured Data → Final Response`
-
-To ensure scalability and maintain low latency on hardware with limited resources (e.g., local 10GB RAM environments), Semantic Routing was introduced. Instead of loading the context window with 40-50 possible system tools, the router performs a similarity search against the user's intent to select only the top-K relevant tools. This significantly reduces the prompt context size, lowers inference times, and makes smaller local LLMs viable for complex orchestration.
-
-The Master Agent is heavily constrained to prevent hallucination: it never fabricates data. It relies entirely on the structured JSON output of the executed tools. Every capability of the database—from querying a key to analyzing runtime memory—is exposed as an isolated tool.
-
-Examples of natural language operations:
-*   "What is consuming my RAM?"
-*   "What is the health of the database?"
-*   "Show active topics."
-*   "List all expired keys."
-
-The system is capable of chain-of-thought execution, combining multiple tools (e.g., retrieving the largest keys, then querying the TTL of those specific keys) to formulate a single, cohesive response.
-
-### Phase 7: Web Dashboard
-To provide a visual control plane alongside the AI interface, a comprehensive dashboard was engineered.
-*   **React and Gin Backend**: The frontend utilizes React for component-driven UI, communicating with a Go (Gin) HTTP backend.
-*   **Server-Sent Events (SSE)**: Selected over WebSockets for one-way, low-latency telemetry streaming. SSE is ideal for real-time monitoring where the server continuously pushes metrics to the client without requiring bidirectional message frames.
-*   **Features**: Includes Real-time monitoring, an integrated AI Chat interface, Database Health visualization, Snapshot management, Live Metrics, an Activity Feed, and a general System Overview.
-*   **Data Flow**:
-
-    `Dashboard → HTTP API → Master Agent → Tools → Response` (AI Request Pipeline)
-    
-    While concurrently running:
-    
-    `SSE Streams → Metrics → Live Dashboard` (Telemetry Pipeline)
-
-The AI inference requests and the real-time telemetry streams operate as strictly independent pipelines to ensure that intensive LLM computations do not block or degrade the monitoring UI.
+| Layer | Status |
+|---|---|
+| RESP decoder (7 types) | ✅ Implemented |
+| RESP encoder (6 types) | ✅ Implemented |
+| TCP RESP server (port 6973) | ✅ Implemented |
+| Native TCP CLI server (port 6969) | ✅ Implemented |
+| Key-value storage (`sync.RWMutex`-protected) | ✅ Implemented |
+| String operations (SET, GET, MGET, STRLEN) | ✅ Implemented |
+| Key management (DEL, EXISTS, KEYS, RENAME, RANDOMKEY, DBSIZE, FLUSHDB) | ✅ Implemented |
+| Integer arithmetic (INCR, DECR, INCRBY, DECRBY) | ✅ Implemented |
+| Key expiration (EXPIRE, TTL, PERSIST) | ✅ Implemented |
+| Point-in-time snapshots (SAVE, LASTSAVE) | ✅ Implemented |
+| Pub/Sub (SUBSCRIBE, PUBLISH, UNSUBSCRIBE) | ✅ Implemented |
+| Pattern Pub/Sub (PSUBSCRIBE, PUNSUBSCRIBE) | ✅ Implemented |
+| Subscriber mode enforcement | ✅ Implemented |
+| Activity logging (ring-buffer based) | ✅ Implemented |
+| Background TTL expiry worker | ✅ Implemented |
+| Background snapshot worker | ✅ Implemented |
+| HTTP SSE event server (port 6971) | ✅ Implemented |
+| AI chat server — HTTP (port 6972) | ✅ Implemented |
+| AI chat server — TCP (port 6970) | ✅ Implemented |
+| RoxAI master agent (Ollama + tool routing) | ✅ Implemented |
+| React web dashboard | ✅ Implemented |
+| Documentation site (`/docs`) | ✅ Implemented |
+| Docker Compose deployment | ✅ Implemented |
+| Redis command compatibility (full) | ❌ Not a goal |
+| Hashes, Sets, Sorted Sets, Lists | ❌ Not implemented |
+| AUTH / ACL | ❌ Not implemented |
+| Clustering / replication | ❌ Not implemented |
+| `SET EX` / `SET PX` options | ❌ Not implemented (use `EXPIRE`) |
 
 ---
 
-# Architecture
+## High-Level Architecture
 
-### High-Level Architecture
+RoxKV runs four concurrent servers from a single Go binary. They all share a common in-memory store protected by `sync.RWMutex`.
+
 ```mermaid
 graph TD
-    User([User]) -->|Browser| Dashboard[React Web Dashboard]
-    Dashboard -->|HTTP REST| API[HTTP API]
-    Dashboard -->|SSE| Telemetry[Telemetry Stream]
-    
-    API --> MasterAgent[Master Agent]
-    MasterAgent --> SemanticRouter[Semantic Tool Router]
-    SemanticRouter --> Tools[Tool Execution Engine]
-    Tools --> RoxKVCore[RoxKV Database Engine]
-    
-    Telemetry --> MetricsCollector[Metrics Collector]
-    MetricsCollector --> RoxKVCore
-    
-    RoxKVCore --> Storage[(In-Memory Storage)]
-    RoxKVCore --> Disk[(Snapshot Disk)]
-```
+    A[Application / redis-cli] -->|RESP over TCP :6973| B[RESP TCP Server]
+    C[Native CLI / scripts] -->|Plain text TCP :6969| D[Plain TCP Server]
+    E[React Dashboard] -->|HTTP :6971| F[HTTP + SSE Server]
+    E -->|HTTP :6972| G[AI Chat HTTP Server]
+    H[AI TCP client] -->|TCP :6970| I[AI Chat TCP Server]
 
-### AI Tool Architecture
-```mermaid
-graph TD
-    Intent[User Intent] --> Embedding[Embedding Generator]
-    Embedding --> VectorSearch[Vector Similarity Search]
-    VectorSearch --> SelectTools[Select Top-K Tools]
-    SelectTools --> LLM[LLM Tool Formatting]
-    LLM --> Executor[Execute Tool Commands]
-    Executor --> DB[Database / System]
-    DB --> JSON[Structured JSON Result]
-    JSON --> FinalLLM[LLM Response Generation]
-```
+    B --> J[RESP Decoder]
+    J --> K[Command Dispatcher]
+    K --> L[RoxKV Core Store]
+    L --> M[Storage]
+    L --> N[TTL / Expiry Worker]
+    L --> O[Pub/Sub Broker]
+    L --> P[Persistence / Snapshots]
 
-### Data Flow
-```mermaid
-sequenceDiagram
-    participant Client
-    participant TCP Server
-    participant Command Parser
-    participant Storage Engine
-    participant Background Workers
-    
-    Client->>TCP Server: Send raw bytes
-    TCP Server->>Command Parser: Decode payload
-    Command Parser->>Storage Engine: Execute command (e.g., SET)
-    Storage Engine-->>Command Parser: Return status
-    Command Parser-->>TCP Server: Encode response
-    TCP Server-->>Client: Send response bytes
-    
-    loop Every N seconds
-        Background Workers->>Storage Engine: Run TTL Eviction
-        Background Workers->>Storage Engine: Trigger Snapshot
-    end
-```
-
-### Dashboard & SSE Architecture
-```mermaid
-graph LR
-    SubGraph1[Client Side]
-    React[React Application]
-    
-    SubGraph2[Server Side]
-    Gin[Router]
-    SSEHandler[SSE Broadcaster]
-    Metrics[Metrics Aggregator]
-    
-    React -->|Establishes SSE Connection| Gin
-    Gin --> SSEHandler
-    Metrics -->|Push Update| SSEHandler
-    SSEHandler -->|Stream Event| React
+    G --> Q[RoxAI Master Agent]
+    Q -->|Ollama API| R[Local LLM - Ollama]
+    Q --> K
+    Q --> F
 ```
 
 ---
 
-# Project Structure
+## System Layers Explained
 
-```text
-├── cmd/             # Application entry points (main routines for server and agents)
-├── internal/        # Private application and library code
-├── agents/          # AI logic, master agent orchestration, and tool definitions
-├── metrics/         # Subsystem for collecting CPU, RAM, and runtime telemetry
-├── storage/         # Core in-memory hash map, mutex management, and CRUD operations
-├── pubsub/          # Publish/Subscribe message broker logic and topic management
-├── worker/          # Background processes for TTL eviction and snapshot persistence
-├── parser/          # TCP payload interpretation and protocol definition
-├── telemetry/       # Event tracking, logging, and operational data pipelines
-├── dashboard/       # Backend logic specific to servicing the web UI
-├── frontend/        # React application source code and assets
-└── ...
+### 1. Storage Layer — `internal/store`
+
+The database is a `map[string]Item` protected by `sync.RWMutex`. Each stored `Item` contains:
+
+- `Key` — the string key
+- `Val any` — the value, internally stored as `[]string` (strings are joined with a space on `GET`)
+- `Meta` — metadata: TTL timestamp, creation time, last-updated time, access count, size in bytes, namespace
+
+Namespaces are extracted automatically from keys containing `:` as a separator (e.g. `user:123` → namespace `user`).
+
+### 2. RESP Compatibility Layer — `internal/resp-parser`
+
+#### Decoder (`decoder.go`)
+
+The decoder reads raw TCP bytes and dispatches on the first byte:
+
+| RESP Prefix | Type | Go Value |
+|---|---|---|
+| `+` | Simple String | `string` |
+| `-` | Simple Error | `string` |
+| `:` | Integer | `int64` |
+| `$` | Bulk String | `string` |
+| `*` | Array | `[]any` |
+| `#` | Boolean | `bool` |
+| `,` | Double | `float64` |
+
+Client commands arrive as a RESP Array of Bulk Strings. The `DecodeArrayString` function extracts them into a `[]string` token slice.
+
+#### Encoder (`encoder.go`)
+
+RoxKV encodes responses using the following RESP types:
+
+| Function | Sends |
+|---|---|
+| `EncodeSimpleString` | `+OK\r\n` |
+| `EncodeSimpleError` | `-ERR ...\r\n` |
+| `EncodeInteger` | `:42\r\n` |
+| `EncodeBulkString` | `$5\r\nhello\r\n` |
+| `EncodeNullValues` | `$-1\r\n` (nil) |
+| `EncodeArray` | `*N\r\n...` (mixed types) |
+
+#### Parser / Dispatcher (`parser.go`)
+
+Each connection reads a RESP frame, decodes it into a `RedisInput{Cmd, Args}` struct, and routes it through a `switch` in `parseCommand`. The dispatcher enforces **Subscriber mode**: once a client has issued `SUBSCRIBE` or `PSUBSCRIBE`, only `(P|S)SUBSCRIBE`, `(P|S)UNSUBSCRIBE`, `PING`, `QUIT`, and `RESET` are permitted.
+
+### 3. TCP Networking Layer — `server/`
+
+| Server | File | Port | Protocol |
+|---|---|---|---|
+| Native CLI server | `server.go` | `6969` | Plain text |
+| AI Chat TCP server | `ChatServer.go` | `6970` | Plain text + Ollama |
+| HTTP / SSE server | `WebServer.go` | `6971` | HTTP, Server-Sent Events |
+| AI Chat HTTP server | `ChatWebServer.go` | `6972` | HTTP + Ollama |
+| RESP-compatible server | `RespServer.go` | `6973` | RESP / TCP |
+
+The RESP server (`RespServer.go`) accepts TCP connections, creates a `utils.NewClient` per connection (with its own mutex and mode tracking), and loops calling `ReadAndHandleConnection` — which decodes the incoming RESP frame and dispatches commands. The server enforces a `MaxConnections = 10` ceiling across both the native and RESP TCP servers. Inactive clients are evicted after 10 minutes of inactivity by a background goroutine.
+
+### 4. Pub/Sub Layer — `internal/pubsub`
+
+RoxKV implements a broker-based Pub/Sub system:
+
+- **Channels** are created lazily on first `SUBSCRIBE` or `PUBLISH`.
+- The `SubrChannel` struct holds a `Subscribers` list, a `Publisher` list, message history, and publish count.
+- Messages are delivered concurrently to all subscribers via goroutines and `sync.WaitGroup`.
+- **Pattern subscriptions** (`PSUBSCRIBE`) use a custom `AsteriskPattern` matcher in `patternmatcher.go`. Patterns must use `.` or `:` as namespace separators and `*` as a wildcard per segment (e.g. `user:*`, `*.events`). Standard Redis glob patterns with `?` or `[...]` are not supported.
+
+### 5. TTL and Expiration — `internal/worker`
+
+Key expiration is handled by a background `ExpiryWorker` goroutine started per-connection. TTL is set by the `EXPIRE` command (in seconds). The `SET` command does **not** support `EX` or `PX` options — expiration must be set separately. Use `TTL` to inspect remaining time and `PERSIST` to remove an expiry.
+
+### 6. Persistence — `internal/persistence`
+
+Persistence uses two mechanisms:
+
+1. **Snapshots**: Point-in-time GOB-encoded snapshots of the entire store. Triggered manually with `SAVE` or automatically by a background `SnapshotWorker`. `LASTSAVE` returns the Unix timestamp of the last snapshot.
+2. **Activity Log**: A persistent file-based ring buffer of all operations, accessible via `MONITOR` and the HTTP SSE `activity` stream.
+
+---
+
+## Supported Commands
+
+The RESP server supports the following commands (verified from `parser.go` and `executor.go`):
+
+**Strings**: `SET`, `GET`, `MGET`, `STRLEN`, `ECHO`  
+**Keys**: `DEL`, `EXISTS`, `KEYS`, `RENAME`, `RANDOMKEY`, `DBSIZE`, `FLUSHDB`  
+**Integers**: `INCR`, `DECR`, `INCRBY`, `DECRBY`  
+**Expiration**: `EXPIRE`, `TTL`, `PERSIST`  
+**Pub/Sub**: `SUBSCRIBE`, `UNSUBSCRIBE`, `PUBLISH`, `PSUBSCRIBE`, `PUNSUBSCRIBE`  
+**Persistence**: `SAVE`, `LASTSAVE`  
+**Connection**: `PING`, `QUIT`, `RESET`, `COMMAND`  
+**Server**: `UPTIME`, `MONITOR`, `DBSIZE`  
+
+> **See the full command reference with syntax, arguments, and return types at `/docs/commands` in the web documentation.**
+
+RoxKV is **RESP-compatible for the supported command subset above**. It is not a full Redis replacement and does not claim full Redis compatibility.
+
+---
+
+## RoxAI
+
+RoxAI is the AI orchestration layer built on top of RoxKV. It enables natural language database management without requiring knowledge of commands.
+
+### How It Works
+
+```
+User Input
+    ↓
+RoxAI Master Agent  ←→  Ollama (local LLM)
+    ↓
+Semantic Tool Router  (selects from registered tools)
+    ↓
+Tool Executor  (kvagent / monitoragent / pubsubagent / storageagent)
+    ↓
+RoxKV Core
+    ↓
+Streamed Response via SSE → React Dashboard
 ```
 
----
+The Master Agent (`agents/Master/Masteragent.go`) receives a natural language query and uses an Ollama model to select among registered sub-agent tools. The tool router (`agents/router`) scores each tool based on the query and dispatches execution. Results are streamed back token-by-token via Server-Sent Events.
 
-# Major Features
+**Tool categories** (from `agents/Master/constants.go`):
+- `kvagent` — key-value read/write/delete/list/save operations  
+- `monitoragent` — CPU, RAM, disk, uptime, client stats  
+- `pubsubagent` — topic inspection, subscriber/publisher management, history  
+- `storageagent` — snapshot listing, storage analytics, TTL inspection  
 
-| Feature | Purpose | Implementation | Benefits |
-| :--- | :--- | :--- | :--- |
-| **In-Memory Storage** | High-speed data access | Go `map` guarded by `sync.RWMutex` | Microsecond latency for reads/writes; minimal lock contention. |
-| **Semantic Tool Routing** | Scale AI capabilities without context limits | Vector embeddings and cosine similarity search | Enables using small local LLMs; drastically reduces token overhead. |
-| **TCP Protocol** | Low-latency binary communication | Custom Go `net.Listener` and socket handlers | Lower overhead than HTTP; stateful connections for clients. |
-| **Real-time Pub/Sub** | Asynchronous event architecture | Concurrent Go channels mapping topics to subscribers | Transforms the database into a reactive message broker. |
-| **Background Workers** | System maintenance without blocking | Detached goroutines with ticker intervals | Automatic memory management (TTL) and data durability (Snapshots). |
-| **SSE Telemetry** | Live monitoring interface | HTTP Server-Sent Events pushed from Gin | Low-latency dashboard updates without WebSocket complexity. |
-| **Storage Intelligence** | Deep data profiling | Aggregation algorithms analyzing metadata | Operational insights into memory bloat and usage patterns. |
+The model used is configurable via the `OLLAMA_MODEL` environment variable (default: `llama3.1:latest`). All inference runs **locally** — no cloud API keys are required.
 
 ---
 
-# Engineering Decisions
+## Web Dashboard
 
-*   **Go**: Selected for its exceptional concurrency primitives (goroutines, channels), compiled performance, and robust standard library (specifically `net` for TCP).
-*   **TCP over HTTP**: Chosen for the core database protocol to minimize header overhead and establish persistent, stateful connections for clients.
-*   **Server-Sent Events (SSE)**: Chosen for the dashboard telemetry as it perfectly fits the one-way (server-to-client) data flow requirement, avoiding the heavy lifecycle management of WebSockets.
-*   **React & Gin**: React provides a reactive, component-based UI, while Gin offers a high-performance, lightweight HTTP routing layer to interface with the Go backend.
-*   **Ollama & Local LLMs**: Ensures data privacy and offline capability. Reduces dependency on external cloud providers for orchestration.
-*   **Semantic Routing**: Mitigates the small context window limitations of local models. Instead of passing schemas for 50 tools, only the 3-5 most relevant are injected into the prompt.
-*   **Strict Tool Calling**: Enforces deterministic outputs. The LLM acts purely as a router and summarizer; it does not execute logic, preventing hallucination.
-*   **Mutexes (`sync.RWMutex`)**: Granular read-write locks were favored over global locks to ensure high read concurrency while maintaining thread safety during writes.
-*   **Workers & Snapshots**: Dedicated goroutines isolate heavy I/O tasks (writing state to disk, scanning for TTL) from the critical path of the TCP event loop.
+The React dashboard (`WebDashBoard/roxkv-dashboard`) connects to the SSE server (port 6971) and the AI chat server (port 6972). It provides:
 
----
+- **Live monitoring**: CPU, RAM, disk, network, goroutine counts
+- **Database view**: key count, total key size, TTL metrics, pub/sub topic list
+- **Snapshot panel**: snapshot count, latest snapshot, next snapshot time
+- **Activity log**: real-time ring-buffer of recent operations
+- **AI Chat**: natural language interface with SSE-streamed responses
+- **CLI terminal**: direct command execution via the native TCP server
 
-# Challenges Faced
-
-*   **Running Local LLMs on 10GB RAM**: Hardware constraints made it impossible to load large models or use vast context windows. This forced the engineering of highly optimized prompts and the semantic routing layer.
-*   **Model Limitations & Tool Routing**: Smaller local models struggle with complex function calling syntax and massive tool definitions, leading to erratic output.
-*   **Architecture Redesign**: Transitioning from a multi-agent debate system (which was too slow and token-heavy) to a streamlined semantic router drastically improved latency.
-*   **React StrictMode with SSE**: Double-mounting in React StrictMode caused duplicate SSE connections and ghost streams, requiring careful implementation of `useEffect` cleanup functions.
-*   **Long Inference Time**: Local model inference blocked synchronous operations. The solution involved decoupling the AI pipeline from the monitoring pipeline to ensure the UI remained responsive.
-*   **Memory Constraints**: In-memory databases inherently face RAM limits. Implementing aggressive TTL algorithms and optimizing Go struct memory alignment were necessary to maximize capacity.
+The SSE server (`/api/events/{name}`) exposes four streams: `monitor`, `storage`, `database`, `activity`.
 
 ---
 
-# Future Roadmap
+## Documentation
 
-*   **Redis Protocol Compatibility**: Implementing the RESP protocol to allow existing Redis clients (e.g., `redis-cli`) to interact seamlessly with RoxKV.
-*   **Vector Search & Embeddings**: Natively supporting vector data types and similarity search within the database engine for faster AI retrievals.
-*   **Authentication & RBAC**: Introducing connection handshakes with credential verification and role-based access control.
-*   **Distributed Cluster & Replication**: Moving from a single-node architecture to a Raft-based consensus cluster with master-replica replication.
-*   **Scheduling & Workflow Automation**: Allowing the AI layer to schedule cron-like tasks and orchestrate multi-step automated workflows natively.
-*   **Memory Optimization**: Implementing custom memory allocators to bypass Go GC pauses for massive datasets.
-*   **Plugin System**: Permitting dynamically loaded shared libraries (.so) to extend database functionality without recompilation.
+The full documentation is available at **`/docs`** in the web dashboard (React app at `WebDashBoard/roxkv-docspage`). This includes:
 
----
-
-# Tech Stack
-
-| Domain | Technology |
-| :--- | :--- |
-| **Core Systems Language** | Go (Golang) |
-| **Networking** | Raw TCP, HTTP/1.1 |
-| **Concurrency Model** | Goroutines, Channels, `sync.RWMutex` |
-| **AI Orchestration** | Local LLMs (Ollama), Custom Semantic Router |
-| **Backend Framework** | Gin (HTTP API & SSE) |
-| **Frontend Framework** | React.js, Vite |
-| **Data Streaming** | Server-Sent Events (SSE) |
-| **Deployment** | Docker, Docker Compose |
+- Technical overview and RESP flow diagram
+- Architecture and server layer breakdown
+- Complete command reference with syntax and return types
+- Pub/Sub usage and pattern matching rules
+- Persistence and TTL behavior
+- Protocol and connection lifecycle
 
 ---
 
-# How to Run
+## Running with Docker (Recommended)
 
-### Docker Compose (Recommended)
+RoxKV and RoxAI are fully containerized for easy deployment without requiring Go or Node.js on your host machine. The Docker setup runs the backend, frontend, and a dedicated Ollama container.
+
+### Requirements
+- Git
+- Docker & Docker Compose
+
+### Installation
+
+1. Clone the repository:
 ```bash
-git clone https://github.com/rahulroxx/roxkv.git
+git clone https://github.com/rahulkumarparida/roxkv.git
 cd roxkv
-docker-compose up --build
 ```
 
-### Local Build
-**Backend:**
+2. Copy the environment template:
 ```bash
-cd cmd/server
-go build -o roxkv-server
-./roxkv-server
+cp .env.example .env
 ```
 
-**Frontend:**
+3. Start the system:
 ```bash
-cd frontend
+docker compose up -d --build
+```
+
+### What Happens Next
+
+- **Ollama Model Initialization**: The Ollama container will start and wait to be healthy. If the configured `OLLAMA_MODEL` (default: `llama3.1:latest`) is not present, it will automatically pull it. This may take several minutes depending on your internet connection.
+- **Backend Startup**: The backend will wait for Ollama to become healthy before starting.
+- **Frontend Startup**: The React dashboard will build its production bundle and become available once the backend is healthy.
+
+### Accessing the Services
+
+- **Dashboard**: http://localhost:5173
+- **RoxKV (RESP)**: `localhost:6973`
+- **RoxKV (Native CLI)**: `localhost:6969`
+- **RoxKV (Events/API)**: `http://localhost:6971`
+
+### Data Persistence
+
+All data is stored in Docker named volumes, meaning it survives container restarts:
+- `roxkv-data`: Stores all database snapshots, activity logs, and metrics.
+- `ollama-data`: Stores downloaded LLM models so they are not re-downloaded.
+
+To stop the system:
+```bash
+docker compose down
+```
+
+To completely delete the system and its persistent data (WARNING: irreversible):
+```bash
+docker compose down -v
+```
+
+---
+
+## Development & Local Execution
+
+If you prefer to run the system directly on your host machine for development:
+
+### Prerequisites
+
+- Go 1.22+
+- Node.js 18+ (for the dashboard)
+- [Ollama](https://ollama.com) running locally with `llama3.1` pulled.
+
+### Start RoxKV
+
+```bash
+# Start the RoxKV server (all servers start concurrently)
+go run ./cmd/roxkv roxkv-tcp
+```
+
+### Start the Web Dashboard
+
+```bash
+cd WebDashBoard/roxkv-dashboard
 npm install
 npm run dev
+# Dashboard available at http://localhost:5173
 ```
 
 ---
 
-# Screenshots
+## Connecting with redis-cli
 
-![alt text](WebDashBoard/roxkv-docspage/src/assets/cli.png)
+Connect to the RESP-compatible server on port **6973**:
 
-![alt text](WebDashBoard/roxkv-docspage/src/assets/Dasboard.png)
-
-![alt text](WebDashBoard/roxkv-docspage/src/assets/Architecture.png)
-
-
----
-
-# Example Commands
-
-### Database Operations (TCP)
 ```bash
-SET mykey "Hello World"
-GET mykey
-DEL mykey
-EXPIRE mykey 60
-```
+redis-cli -p 6973
 
-### Pub/Sub Operations
-```bash
-SUBSCRIBE "system_events"
-PUBLISH "system_events" "Backup completed successfully"
-```
+127.0.0.1:6973> PING
+PONG
 
-### AI Orchestration (HTTP/Dashboard)
-```json
-POST /api/chat
-{
-  "prompt": "Show me the largest keys currently stored."
-}
-```
+127.0.0.1:6973> SET mykey "hello world"
+OK
 
-### Monitoring
-```bash
-INFO SERVER
-INFO MEMORY
+127.0.0.1:6973> GET mykey
+"hello world"
 ```
 
 ---
 
-# Example AI Queries
+## Connecting from an Application
 
-1. "What is the overall health of the database?"
-2. "List all keys that are expiring in the next 5 minutes."
-3. "Why is my RAM usage so high right now?"
-4. "Show me the 10 largest keys in memory."
-5. "Create a snapshot of the current database state."
-6. "How many active TCP clients are connected?"
-7. "What is the current operation throughput (commands per second)?"
-8. "Which topic has the most active subscribers?"
-9. "Purge all expired keys immediately."
-10. "Give me a breakdown of memory fragmentation."
-11. "Who is the oldest client connected?"
-12. "What are the latest system errors logged?"
-13. "Calculate the average size of stored values."
-14. "Disable background snapshots temporarily."
-15. "Publish a maintenance warning to the 'alerts' topic."
-16. "How many goroutines are currently active in the runtime?"
-17. "Compare current disk usage against yesterday's metrics."
-18. "Are there any deadlocked connections?"
-19. "Set the TTL of 'cache_token' to 3600 seconds."
-20. "Generate a comprehensive health report for the storage engine."
+Any Redis client library can connect to port **6973** as a standard RESP server:
+
+```go
+// Go — using go-redis
+rdb := redis.NewClient(&redis.Options{
+    Addr: "localhost:6973",
+})
+
+val, err := rdb.Set(ctx, "key", "value", 0).Result()
+```
 
 ---
 
-# Lessons Learned
+## Current Limitations
 
-Building RoxAI and RoxKV provided profound insights into several computer science domains:
-*   **Systems Programming**: Designing a database from scratch enforces a rigorous understanding of memory allocation, pointer arithmetic, and cache locality.
-*   **AI Orchestration**: LLMs are powerful, but non-deterministic. Building an orchestration layer proved that strict constraints, semantic routing, and structured tool outputs are mandatory for reliable infrastructure automation.
-*   **Networking**: Implementing raw TCP servers highlighted the exact overhead added by HTTP and the complexities of managing persistent socket lifecycles, EOF handling, and broken pipes.
-*   **Tool Execution**: Bridging the gap between natural language strings and executable Go functions required building highly resilient parsers and error-handling boundaries.
-*   **Concurrency & Go**: The project served as an extensive exercise in Go's concurrency model. Managing race conditions, preventing deadlocks with `RWMutex`, and avoiding goroutine leaks became primary engineering focuses.
+The following Redis functionality is **not implemented** in RoxKV:
+
+| Feature | Notes |
+|---|---|
+| `SET EX / PX / NX / XX` options | Use `SET` then `EXPIRE` separately |
+| Lists, Sets, Hashes, Sorted Sets | String values only |
+| `SCAN` / `HSCAN` / `SSCAN` | Not implemented |
+| `AUTH` / password protection | Not implemented |
+| `SELECT` / multiple databases | Single database only |
+| Transactions (`MULTI` / `EXEC`) | Not implemented |
+| Lua scripting (`EVAL`) | Not implemented |
+| Replication / clustering | Not implemented |
+| `PEXPIRE` / millisecond TTL | Seconds only via `EXPIRE` |
+| Pattern matching in `KEYS` | Partial — contains-based, not full glob |
+| PSUBSCRIBE glob patterns (`?`, `[...]`) | `*` wildcard only, with `.`/`:` namespacing |
 
 ---
 
-# License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-# Author
-
-**Rahul Kumar Parida**
-*   GitHub: [rahulroxx](https://github.com/rahulroxx)
-*   LinkedIn: [Rahul Kumar Parida](https://linkedin.com/in/placeholder)
+MIT — see [LICENSE.md](LICENSE.md)

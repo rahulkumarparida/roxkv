@@ -1,0 +1,44 @@
+# Override for local development with hot-reload.
+# Active by default when docker-compose.yml is present alongside this file.
+#
+# Usage:
+#   docker compose up --build
+#
+# To run production-only (ignoring this override):
+#   docker compose -f docker-compose.yml up --build
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # In dev, mount source and use go run for hot reload
+    command: ["go", "run", "./cmd/roxkv", "roxkv-tcp"]
+    volumes:
+      - .:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+      - roxkv-data:/root/.roxkv
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    # In dev, run vite dev server with HMR instead of static serve
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:6971}
+      VITE_CHAT_API_BASE_URL: ${VITE_CHAT_API_BASE_URL:-http://localhost:6972}
+      VITE_BACKEND_SSE_TARGET: ${VITE_BACKEND_SSE_TARGET:-http://backend:6971}
+      VITE_BACKEND_CHAT_TARGET: ${VITE_BACKEND_CHAT_TARGET:-http://backend:6972}
+    volumes:
+      - ./WebDashBoard/roxkv-dashboard:/app
+      - frontend-node-modules:/app/node_modules
+
+volumes:
+  go-mod-cache:
+  go-build-cache:
+  frontend-node-modules:
+  roxkv-data:
