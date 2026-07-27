@@ -326,7 +326,7 @@ func SubscriberCommand(client *utils.NewClient, input []string) bool {
 	}
 
 	val := pubsub.HandleSubscribers(client, input[0])
-	return val
+	return val != nil
 }
 
 func PublishCommand(client *utils.NewClient, input []string) any {

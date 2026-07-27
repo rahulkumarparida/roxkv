@@ -20,6 +20,7 @@ type SubrChannel struct {
 	Subscribers   []*utils.NewClient `json:"subscribers"`
 	Publisher     []*utils.NewClient `json:"publisher"`
 	Topic         string             `json:"topic"`
+	PTopic 		  map[string]string			 `json:"ptopic"`
 	SubscribeChan chan string        `json:"-"`
 	Wg            sync.WaitGroup     `json:"-"`
 	Mu            sync.RWMutex       `json:"-"`
@@ -33,12 +34,15 @@ type SubrChannel struct {
 
 // Collects all the channel for the broker to decide the message to send to, along with all the names
 type AllChannels struct {
-	Channels     []*SubrChannel `json:"channels"`
+	Channels     map[string]*SubrChannel `json:"channels"`
 	ChannelNames []string       `json:"channelNames"`
 	Mu           sync.RWMutex   `json:"-"`
 }
 
 var Helper AllChannels
+
+
+
 
 func CreateTopic(client *utils.NewClient, topic string) *SubrChannel {
 	publisher := []*utils.NewClient{client}
@@ -47,6 +51,7 @@ func CreateTopic(client *utils.NewClient, topic string) *SubrChannel {
 		Subscribers:   []*utils.NewClient{},
 		Publisher:     publisher,
 		Topic:         topic,
+		PTopic: 	   map[string]string{},	
 		SubscribeChan: make(chan string, 100),
 		Wg:            sync.WaitGroup{},
 		Mu:            sync.RWMutex{},
@@ -62,11 +67,15 @@ func CreateTopic(client *utils.NewClient, topic string) *SubrChannel {
 }
 
 func FindChannel(collection *AllChannels, topic string) (*SubrChannel, bool) {
+	if collection.Channels == nil {
+		collection.Channels = make(map[string]*SubrChannel)
+	}
+	
 
-	for _, channel := range collection.Channels {
-		if channel.Topic == topic {
+	channel := collection.Channels[topic]
+
+	if channel != nil {
 			return channel, true
-		}
 	}
 	
 
@@ -87,12 +96,12 @@ func GetChannel(client *utils.NewClient, topic string) *SubrChannel {
 
 	channel = CreateTopic(client, topic)
 	Helper.ChannelNames = append(Helper.ChannelNames, channel.Topic)
-	Helper.Channels = append(Helper.Channels, channel)
+	Helper.Channels[channel.Topic] = channel
 
 	return channel
 }
 
-func HandleSubscribers(client *utils.NewClient, topic string) bool {
+func HandleSubscribers(client *utils.NewClient, topic string) *SubrChannel {
 	channel := GetChannel(client, topic)
 
 	channel.Mu.Lock()
@@ -100,7 +109,7 @@ func HandleSubscribers(client *utils.NewClient, topic string) bool {
 	channel.Subscribers = append(channel.Subscribers, client)
 	channel.Mu.Unlock()
 
-	return true
+	return channel
 }
 
 func DeliverMessage(sub *utils.NewClient, msg string, wg *sync.WaitGroup) {
@@ -203,6 +212,8 @@ func CloseChannel(client *utils.NewClient, topic string) {
 	topics := make([]string, len(Helper.ChannelNames))
 	copy(topics, Helper.ChannelNames)
 
+	delete(Helper.Channels,topic)	
+
 	for idx, channel := range topics {
 		if channel == topic {
 			Helper.ChannelNames = slices.Delete(Helper.ChannelNames, idx, idx+1)
@@ -211,15 +222,8 @@ func CloseChannel(client *utils.NewClient, topic string) {
 		}
 	}
 
-	topicsChannel := make([]*SubrChannel, len(Helper.Channels))
-	copy(topicsChannel, Helper.Channels)
-
-	for idx, channel := range topicsChannel {
-		if channel.Topic == topic {
-			Helper.Channels = slices.Delete(Helper.Channels, idx, idx+1)
-			break
-		}
-	}
+	
+	
 	Helper.Mu.Unlock()
 
 	GetTopics(client)
@@ -266,8 +270,7 @@ func GetAllMembers(client *utils.NewClient, subOrPub string) []*utils.NewClient 
 	logger.InfoLog(" " + client.Role + " : Invoked all the members of all the topics")
 
 	Helper.Mu.Lock()
-	topicsChannel := make([]*SubrChannel, len(Helper.Channels))
-	copy(topicsChannel, Helper.Channels)
+	topicsChannel := Helper.Channels
 	Helper.Mu.Unlock()
 	var clients []*utils.NewClient
 	for _, channel := range topicsChannel {
