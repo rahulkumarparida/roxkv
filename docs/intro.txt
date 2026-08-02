@@ -17,6 +17,8 @@ The goal of this project is not to replace Redis, but to explore the engineering
 ### Storage Engine
 
 * In-memory key-value storage
+* Binary-safe value storage using []byte
+* Compatible with redis-py, django-redis, and arbitrary binary payloads
 * Thread-safe operations using `sync.RWMutex`
 * Shared storage across multiple TCP clients
 

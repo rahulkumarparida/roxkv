@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -28,10 +29,19 @@ func ParseCommands(store *store.MemoryAlloc, input []string, client *utils.NewCl
 	switch input[0] {
 	case "GET", "get", "Get":
 		val := GetCommand(store, data)
-		// fmt.Println(val)
+		if b, ok := val.([]byte); ok {
+			return string(b)
+		}
 		return val
 	case "SET", "set", "Set":
-		val := SetCommand(client, store, data)
+		
+		var bytesdata  [][]byte 
+		for _,d := range data{
+			singleData := []byte(d)
+			bytesdata = append(bytesdata, singleData)
+		} 
+
+		val := SetCommand(client, store, [][]byte(bytesdata))
 		if val {
 			fmt.Println("Added the KeyValue")
 			return val
@@ -102,49 +112,49 @@ func ParseCommands(store *store.MemoryAlloc, input []string, client *utils.NewCl
 
 }
 
-func ParseInput(data []string) []string {
-	var result []string
-	var current []rune
+// func ParseInput(data []string) []string {
+// 	var result [][]byte
+// 	var current []rune
 
-	var inQuote bool
-	var quoteChar rune
+// 	var inQuote bool
+// 	var quoteChar rune
 
-	for _, token := range data {
-		for _, ch := range token {
+// 	for _, token := range data {
+// 		for _, ch := range token {
 
-			switch {
-			case !inQuote && (ch == '"' || ch == '\'' || ch == '`'):
-				inQuote = true
-				quoteChar = ch
+// 			switch {
+// 			case !inQuote && (ch == '"' || ch == '\'' || ch == '`'):
+// 				inQuote = true
+// 				quoteChar = ch
 
-			case inQuote && ch == quoteChar:
-				inQuote = false
+// 			case inQuote && ch == quoteChar:
+// 				inQuote = false
 
-			case !inQuote && ch == ' ':
-				if len(current) > 0 {
-					result = append(result, string(current))
-					current = current[:0]
-				}
+// 			case !inQuote && ch == ' ':
+// 				if len(current) > 0 {
+// 					result = append(result, []byte(current))
+// 					current = current[:0]
+// 				}
 
-			default:
-				current = append(current, ch)
-			}
-		}
+// 			default:
+// 				current = append(current, ch)
+// 			}
+// 		}
 
-		if inQuote {
-			current = append(current, ' ')
-		} else if len(current) > 0 {
-			result = append(result, string(current))
-			current = current[:0]
-		}
-	}
+// 		if inQuote {
+// 			current = append(current, ' ')
+// 		} else if len(current) > 0 {
+// 			result = append(result, []byte(current))
+// 			current = current[:0]
+// 		}
+// 	}
 
-	if len(current) > 0 {
-		result = append(result, string(current))
-	}
+// 	if len(current) > 0 {
+// 		result = append(result, []byte(current))
+// 	}
 
-	return result
-}
+// 	return result
+// }
 
 func evaluatetime(ttl int, dur string) time.Time {
 
@@ -160,7 +170,7 @@ func evaluatetime(ttl int, dur string) time.Time {
 	}
 }
 
-func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string) bool {
+func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data [][]byte) bool {
 	var dataItems store.Item
 
 	if len(data[1:]) <= 0 {
@@ -170,24 +180,24 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string)
 
 	}
 
-	if data[0] == "--ttl" {
+	if string(data[0]) == "--ttl" {
 		ttlVals := data[1:3]
 		dataVals := data[3:]
 		
-		if len(ttlVals) > 2 || ttlVals[0] == "" || ttlVals[1] == "" {
+		if len(ttlVals) > 2 || string(ttlVals[0]) == "" || string(ttlVals[1]) == "" {
 			logger.ErrorLog("2 Args after the --ttl flag")
 			fmt.Println("2 args after --ttl")
 			return false
 		}
-		value := dataVals[1:]
+		value := bytes.Join(dataVals[1:],[]byte(" "))
 		sizeOfValue := len(value)
-		var timetoAdd, err = strconv.Atoi(ttlVals[0]) // time like 12 ,13 ,14
+		var timetoAdd, err = strconv.Atoi(string(ttlVals[0])) // time like 12 ,13 ,14
 
 		if utils.HandleError("Error while parsing time provided", err) {
 			logger.ErrorLog("Parsing failed while parsing the time. Integre required")
 			return false
 		}
-		futuretime := evaluatetime(timetoAdd, ttlVals[1])
+		futuretime := evaluatetime(timetoAdd, string(ttlVals[1]))
 
 		meta := store.Metadata{
 			TTL:           futuretime,
@@ -197,7 +207,7 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string)
 		}
 
 		dataItems = store.Item{
-			Key:  dataVals[0],
+			Key:  string(dataVals[0]),
 			Val:  value,
 			Meta: meta,
 		}
@@ -210,7 +220,7 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string)
 		
 
 	} else {
-		value := ParseInput(data[1:])
+		value := bytes.Join(data[1:],[]byte(" "))
 		sizeOfValue := len(value)
 		store.TTLMetricsContainer.PermanentKeys += 1
 		meta := store.Metadata{
@@ -221,7 +231,7 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string)
 		}
 
 		dataItems = store.Item{
-			Key:  data[0],
+			Key:  string(data[0]),
 			Val:  value,
 			Meta: meta,
 		}
@@ -229,6 +239,45 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data []string)
 
 	store.SetKv(stre, &dataItems)
 
+	return true
+}
+
+// SetCommandBytes stores a raw []byte value for the given key.
+// Used by the RESP server path where values are already binary.
+func SetCommandBytes(client *utils.NewClient, stre *store.MemoryAlloc, key string, val []byte, ttlSeconds int, ttlUnit string) bool {
+	var dataItems store.Item
+	sizeOfValue := len(val)
+
+	if ttlSeconds > 0 && ttlUnit != "" {
+		futuretime := evaluatetime(ttlSeconds, ttlUnit)
+		meta := store.Metadata{
+			TTL:           futuretime,
+			UpdatedAt:     time.Now(),
+			LastAcessedBy: client,
+			Size:          int64(sizeOfValue),
+		}
+		dataItems = store.Item{
+			Key:  key,
+			Val:  val,
+			Meta: meta,
+		}
+		store.TTLMetricsContainer.ActiveTTLKeys += 1
+	} else {
+		store.TTLMetricsContainer.PermanentKeys += 1
+		meta := store.Metadata{
+			TTL:           time.Time{},
+			UpdatedAt:     time.Now(),
+			LastAcessedBy: client,
+			Size:          int64(sizeOfValue),
+		}
+		dataItems = store.Item{
+			Key:  key,
+			Val:  val,
+			Meta: meta,
+		}
+	}
+
+	store.SetKv(stre, &dataItems)
 	return true
 }
 

@@ -14,7 +14,7 @@ The project was built as an educational systems programming exercise — a deep 
 | RESP encoder (6 types) | ✅ Implemented |
 | TCP RESP server (port 6973) | ✅ Implemented |
 | Native TCP CLI server (port 6969) | ✅ Implemented |
-| Key-value storage (`sync.RWMutex`-protected) | ✅ Implemented |
+| Key-value storage (binary-safe `[]byte`, `sync.RWMutex`-protected) | ✅ Implemented |
 | String operations (SET, GET, MGET, STRLEN) | ✅ Implemented |
 | Key management (DEL, EXISTS, KEYS, RENAME, RANDOMKEY, DBSIZE, FLUSHDB) | ✅ Implemented |
 | Integer arithmetic (INCR, DECR, INCRBY, DECRBY) | ✅ Implemented |
@@ -76,7 +76,7 @@ graph TD
 The database is a `map[string]Item` protected by `sync.RWMutex`. Each stored `Item` contains:
 
 - `Key` — the string key
-- `Val any` — the value, internally stored as `[]string` (strings are joined with a space on `GET`)
+- `Val []byte` — the value, stored internally as raw binary-safe bytes (`[]byte`)
 - `Meta` — metadata: TTL timestamp, creation time, last-updated time, access count, size in bytes, namespace
 
 Namespaces are extracted automatically from keys containing `:` as a separator (e.g. `user:123` → namespace `user`).
@@ -147,6 +147,15 @@ Persistence uses two mechanisms:
 
 1. **Snapshots**: Point-in-time GOB-encoded snapshots of the entire store. Triggered manually with `SAVE` or automatically by a background `SnapshotWorker`. `LASTSAVE` returns the Unix timestamp of the last snapshot.
 2. **Activity Log**: A persistent file-based ring buffer of all operations, accessible via `MONITOR` and the HTTP SSE `activity` stream.
+
+### 7. Binary-Safe Storage
+
+RoxKV stores all values as raw bytes (`[]byte`), providing full binary safety across the system:
+
+- **Raw Byte Storage**: RoxKV stores values as raw bytes (`[]byte`) without UTF-8 string conversion or string allocations.
+- **Client Compatibility**: Compatible with `redis-cli`, `redis-py`, `django-redis`, and standard Redis clients.
+- **Arbitrary Payload Support**: Supports arbitrary binary payloads (pickle, protobuf, compressed data, images).
+- **Migration Reference**: See [BYTES.md](BYTES.md) for migration details.
 
 ---
 

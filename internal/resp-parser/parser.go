@@ -1,9 +1,11 @@
 package redisparser
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -11,44 +13,132 @@ import (
 
 
 type RedisInput struct{
-	Cmd string
-	Args []string
+	Cmd     string
+	Args    []string   // string args for command names, keys, flags
+	RawArgs [][]byte   // raw binary args from RESP (values stay as bytes)
 }
 
+var Mu = sync.Mutex{}
+var tmpCommandData [][][]byte
+
+func HandleMultipleCommands(client *utils.NewClient,buf []byte, n int) ([][][]byte,int,error){
+	fmt.Println("Iter: ", len(tmpCommandData))
+	tokens , till , err := DecodeArrayString(client.Buffer,len(client.Buffer))
+	if err != nil{
+		if err == ErrIncompleteRESP {
+			fmt.Println("Erro:",err)
+			return nil, 0 , err
+		}
+		return nil, till, errors.New("Incorrect RESP command") 
+	}
+	if tokens != nil{
+	tmpCommandData = append(tmpCommandData, tokens)			
+	}	
+	if tokens == nil || till >= len(buf) {
+		Mu.Lock()
+		command := tmpCommandData
+		tmpCommandData = [][][]byte{}
+		Mu.Unlock()
+		return  command, till , err
+	}
+	
+	
+	
+	return 	HandleMultipleCommands(client,buf[till:],n)
+}
 
 
 func ReadAndHandleConnection(client *utils.NewClient) {
 
-	var buf []byte =make([]byte, 512)
-
-	n, err := client.Conn.Read(buf[:])
-
-	if err != nil{
-		return 
-	}
-
-	tokens , err := DecodeArrayString(buf[:n])
-
-	var input *RedisInput
-
-	if len(tokens) >= 2 {
-
-		input =  &RedisInput{
-			Cmd: tokens[0],
-			Args: tokens[1:],
-		}	
-	}else {
-		input = &RedisInput{
-			Cmd: tokens[0],
-			Args: nil,
+	var buf []byte =make([]byte, 4096)
+	for {
+		n, err := client.Conn.Read(buf)
+		if err != nil {
+			fmt.Println("Err:", err.Error(), " Client: ", client.Conn)
+			break
 		}
+
+		client.Buffer = append(client.Buffer, buf[:n]...)	
+		
+		for {
+			datalist, readTill ,err := HandleMultipleCommands(client, client.Buffer,n)
+
+			if err != nil &&  err == ErrIncompleteRESP {
+				break
+			}
+			if datalist == nil {
+				break
+			}else {
+				ExecuteTokens(client,datalist,readTill)
+
+				client.Mu.Lock()
+				client.Buffer = client.Buffer[readTill:]
+				client.Mu.Unlock()
+					
+			}
+			
+			if len(client.Buffer) == 0 {
+				break
+			}
+		
+		}
+					
 	}
 
 	
-	parseCommand(input, client)
+}
+
+// Should be only to execute the commands not decode it should only receieve decoded [][]string // buffer
+func ExecuteTokens(client *utils.NewClient,allTokenList [][][]byte , n int) {
+
+
+		
+			for _, tokens := range allTokenList {
+				// fmt.Println("Token:", tokens)/
+				
+				if  len(tokens)== 0{
+					data := EncodeNullValues()
+					client.Conn.Write([]byte(data))
+					break
+				}
+
+				var input *RedisInput
+
+				if len(tokens) >= 2 {
+					fmt.Println("Token 0:", string(tokens[0]), tokens[0])
+					input = &RedisInput{
+						Cmd:     string(tokens[0]),
+						Args:    bytesSliceToStrings(tokens[1:]),
+						RawArgs: tokens[1:],
+					}
+				}else {
+					input = &RedisInput{
+						Cmd:     string(tokens[0]),
+						Args:    nil,
+						RawArgs: nil,
+					}
+				}
+
+				
+				parseCommand(input, client)		
+				allTokenList= allTokenList[1:]
+			}
+		
+			allTokenList = [][][]byte{}	
 
 }
 
+
+
+// bytesSliceToStrings converts [][]byte to []string for command/key/flag use.
+// Only use for known textual data, not for values.
+func bytesSliceToStrings(bs [][]byte) []string {
+	ss := make([]string, len(bs))
+	for i, b := range bs {
+		ss[i] = string(b)
+	}
+	return ss
+}
 
 func parseCommand(input *RedisInput, client *utils.NewClient) {
 	if PatternRegister == nil{
@@ -71,6 +161,7 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 
 
 
+	fmt.Println("Input:", input)	
 	switch strings.ToLower(input.Cmd){
 		case "ping":
 			fmt.Println("Executing ping", input.Args)
@@ -86,14 +177,18 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 			}
 			val := ExecutePing(input.Args)
 			client.Conn.Write([]byte(val))
+		case "client":
+			fmt.Println("Executing Client ",input.Args[0])
+			data := ExecuteClientname(input.Args,client)
+			client.Conn.Write([]byte(data))
 		case "set":
-			fmt.Println("Executing set , args: ", input.Args)
-			data :=ExecuteSet(input.Args , client)
+			fmt.Println("Executing set , args: ", input.RawArgs)
+			data :=ExecuteSet(input , client)
 			client.Conn.Write([]byte(data.(string)))
 		case "get":
 			fmt.Println("Executing get")
 			data := ExecuteGet(input.Args)
-			client.Conn.Write([]byte(data))
+			client.Conn.Write(data)
 		case "del":
 			fmt.Println("Executing delete")
 			data := ExecuteDel(input.Args)
@@ -112,7 +207,7 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 			client.Conn.Write([]byte(val))
 		case "expire":
 			fmt.Println("executing Expire")
-			val := ExecuteExpire(input.Args,client)
+			val := ExecuteExpire(input.RawArgs,client)
 			client.Conn.Write([]byte(val))
 		case "flushdb":
 			fmt.Println("Executing Flush")
@@ -158,9 +253,23 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 			fmt.Println("Executing strlen")
 			val := ExecuteStrLen(input.Args)
 			client.Conn.Write([]byte(val))
-		case "command","docs":
-			fmt.Println("command")
-			client.Conn.Write([]byte("*0\r\n"))
+		case "command":
+			fmt.Println("Executed command")
+			if len(input.Args) <= 1 {
+				if len(input.Args) == 1 && strings.ToLower(input.Args[0]) == "docs"{
+					data := ExecuteCommandDocs()
+					client.Conn.Write([]byte(data))
+					
+				}else if len(input.Args) == 0{
+					data := ExecuteCommand()
+					client.Conn.Write([]byte(data))
+
+				}else{
+					encode , _:= EncodeSimpleError("ERR wrong number of arguments for 'command' command")
+					client.Conn.Write([]byte(encode))
+				}
+			}	
+			return
 		case "subscribe","psubscribe","publish","unsubscribe","punsubscribe":
 			
 			if input.Cmd =="subscribe" {
@@ -207,6 +316,10 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 				time.Sleep(2*time.Second)
 				client.Conn.Write([]byte(data))
 			}
+		case "select":
+			fmt.Println("Executing select database space:", input.Args)
+			// Return OK to satisfy connection setup workflows
+			client.Conn.Write([]byte("+OK\r\n"))
 
 		default:
 			fmt.Println("None Command found")

@@ -161,7 +161,9 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, c
 				}
 				_ = json.Unmarshal(argsByte, &args)
 				result := store.GetKv(stre, strings.TrimSpace(args.Key))
-				response = result.Val
+				if result.Val != nil {
+					response = string(result.Val)
+				}
 			case "set":
 				var args struct {
 					Key   string `json:"key"`
@@ -173,11 +175,11 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, c
 					TTL:           time.Time{},
 					UpdatedAt:     time.Now(),
 					LastAcessedBy: user,
-					Size:          int64(len(args.Value)),
+					Size:          int64(len(strings.TrimSpace(args.Value))),
 				}
 				item := store.Item{
 					Key:  strings.TrimSpace(args.Key),
-					Val:  strings.TrimSpace(args.Value),
+					Val:  []byte(strings.TrimSpace(args.Value)),
 					Meta: meta,
 				}
 

@@ -60,7 +60,8 @@ COMMANDS
 
           Values may span multiple words and may be enclosed in
           single quotes (' '), double quotes (" "), or backticks (` `)
-          to preserve spaces.
+          to preserve spaces. Values are stored as binary-safe
+          bytes ([]byte).
 
           Examples:
               set username rahul
@@ -92,6 +93,8 @@ COMMANDS
 
           If the key does not exist, nil is returned. If the key has
           already expired, it is deleted immediately before returning.
+          Values are stored as binary-safe bytes ([]byte) and are
+          returned exactly as stored.
 
           Examples:
 

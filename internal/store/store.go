@@ -44,7 +44,7 @@ type Metadata struct {
 
 type Item struct {
 	Key  string   `json:"key"`
-	Val  any      `json:"val"` // should be converted to []byte only
+	Val  []byte   `json:"val"` // binary-safe value storage
 	Meta Metadata `json:"meta"`
 }
 
@@ -234,12 +234,9 @@ func SetKv(store *MemoryAlloc, kv *Item) bool {
 // Retieves the similar value from the memory and sends it back
 func GetKv(store *MemoryAlloc, key string) Item {
 
-	data, exists := store.Get(key)
+	data, _ := store.Get(key)
 
-	if !exists {
-		return data
-	}
-
+	
 	return data
 }
 

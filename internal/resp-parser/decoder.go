@@ -4,6 +4,7 @@ import (
 	// "bufio"
 	"errors"
 	"fmt"
+
 	// "io"
 	"strconv"
 	// "strings"
@@ -22,26 +23,15 @@ const (
 	ERROR = '-'
 )
 
-// func main(){
-// 	rawStream := io.Reader(strings.NewReader("-Error Reading a data\r\n\t"))
-// 	reader := bufio.NewReader(rawStream)
-// 	line, err := reader.ReadBytes('\t')
-// 	if err != nil {
-// 		fmt.Println("Error:", err)
-// 		return
-// 	}
-
-
-// 	val , err := Decode(line)
-// 	fmt.Println("Val:", val)
-
-// }
-
+var ErrIncompleteRESP = errors.New("ErrIncompleteRESP3")
 
 func simpleReadError(data []byte) (string,int,error){
 	pos := 1
 
 	for; data[pos] != '\r'; pos++{
+		if pos == len(data)-1 && data[pos] != '\r' {
+			return "" , 0 , ErrIncompleteRESP
+		}
 	}
 
 	errorval := string(data[1:pos])
@@ -73,6 +63,9 @@ func readSimpleString(data []byte)  (string,int,error){
 	pos := 1
 
 	for; data[pos] != '\r'; pos++{
+		if pos == len(data)-1 && data[pos] != '\r' {
+			return "", 0 , ErrIncompleteRESP
+		}
 	}
 
 	return string(data[1:pos]) , pos+2 , nil
@@ -83,12 +76,13 @@ func readInteger(data []byte)  (int64,int,error){
 	pos := 1
 
 	for; data[pos] != byte('\r'); pos++{
+		
 	}
 
 	i64 , err := strconv.ParseInt(string(data[1:pos]), 10 , 64)
 
 	if err != nil {
-		return  0 , pos , err
+		return  0 , 0 , err
 	}
 
 
@@ -97,7 +91,7 @@ func readInteger(data []byte)  (int64,int,error){
 	return i64 , pos+2 , nil
 }
 
-func readLength(data []byte) (int,int){
+func ReadLength(data []byte) (int,int){
 	pos , length := 0,0
 
 	for pos = range data {
@@ -113,16 +107,21 @@ func readLength(data []byte) (int,int){
 
 }
 
-func readBulkString(data []byte)   (string,int,error){
+func readBulkString(data []byte)   ([]byte,int,error){
 	
 	pos := 1
 
 	
 	// returns the length of the string incoming and the delta value which is the number of charachters read after the first char
-	length , delta := readLength(data[pos:])
+	length , delta := ReadLength(data[pos:])
 	pos = pos + delta
-			// starts slicing aftre the \r\n and ends on the exact length provided
-	return  string(data[pos:(pos+length)]) , pos+ length + 2 , nil
+	fmt.Println("Bulk length:", length)
+	fmt.Println("Remaining:", len(data)-pos)
+	if pos+length+2 > len(data) {
+   		 return nil, 0,  ErrIncompleteRESP
+	}
+	// starts slicing aftre the \r\n and ends on the exact length provided
+	return  data[pos:(pos+length)] , pos+ length + 2 , nil
 }
 
 
@@ -131,7 +130,7 @@ func readArray(data []byte)  (any,int,error){
 
 	pos := 1
 
-	totalElems , delta := readLength(data[pos:])
+	totalElems , delta := ReadLength(data[pos:])
 
 	pos += delta
 
@@ -142,6 +141,9 @@ func readArray(data []byte)  (any,int,error){
 		val , posi , err := DecodeOne(data[pos:])
 	
 		if err != nil {
+			if err == ErrIncompleteRESP {
+				return  nil , 0 , ErrIncompleteRESP	
+			}
 			return nil , 0 , errors.New("Error while parsing elements")
 		}
 
@@ -149,7 +151,7 @@ func readArray(data []byte)  (any,int,error){
 		pos += posi
 	}
 
-	return  elements , pos+2 , nil
+	return  elements , pos , nil
 }
 
 
@@ -185,7 +187,7 @@ func readDoubles(data []byte) (float64 , int , error){
 	f64 , err := strconv.ParseFloat(fmt.Sprintf("%v.%v", integerpart, decimalpart),64)
 
 	if err != nil{
-		return 0.0 , pos , errors.New("Error Parsing the decimal")
+		return 0.0 , 0 , errors.New("Error Parsing the decimal")
 	}
 
 
@@ -201,25 +203,18 @@ func DecodeOne(data []byte) (any,int,error){
 
 	switch data[0]{
 		case SIMPLESTRING:
-			// fmt.Println("Simple string")
 			return readSimpleString(data)
 		case INTERGER:
-			// fmt.Println("Integer")
 			return readInteger(data)
 		case BULKSTRING:
-			// fmt.Println("Bulk String")
 			return readBulkString(data)
 		case ARRAY:
-			// fmt.Println("Array")
 			return readArray(data)
 		case BOOLEAN:
-			// fmt.Println("Boolean")
 			return readBoolean(data)
 		case DOUBLES:
-			// fmt.Println("Double")
 			return readDoubles(data)
 		case ERROR:
-			// fmt.Println("Error")
 			return simpleReadError(data)
 		default:
 			return 	nil , 0 , errors.New("Data Type Didn't match")
@@ -232,30 +227,41 @@ func DecodeOne(data []byte) (any,int,error){
 }
 
 
-func Decode(data []byte) (any,error){
+func Decode(data []byte) (any,int,error){
 	if len(data) == 0 {
-		return  nil , errors.New("No Data Found")
+		return  nil , 0 , errors.New("No Data Found")
 	}
 
-	value , _ , err := DecodeOne(data)
+	value , idx , err := DecodeOne(data)
 
-	return  value , err
+	return  value, idx , err
 }
 
 
-func DecodeArrayString(data []byte) ([]string, error){
-	value , err := Decode(data)
-	if err != nil {
-		return  nil , err
-	}
+func DecodeArrayString(data []byte, n int) ([][]byte, int, error) {
 
+    value, idx, err := Decode(data[:n])
 
-	array := value.([]any)
-	tokens := make([]string, len(array))
+    if err != nil {
+        return nil, 0, err
+    }
 
-	for i := range tokens {
-		tokens[i] = array[i].(string)
-	}
+    array, ok := value.([]any)
+    if !ok {
+        return nil, 0, errors.New("expected RESP array")
+    }
 
-	return tokens , nil
+    tokens := make([][]byte, len(array))
+
+    for i := range array {
+
+        s, ok := array[i].([]byte)
+        if !ok {
+            return nil, 0, errors.New("expected bulk string")
+        }
+
+        tokens[i] = s
+    }
+
+    return tokens, idx, nil
 }

@@ -1,6 +1,7 @@
 package redisparser
 
 import (
+	// "bytes"
 	"fmt"
 	"math/rand/v2"
 	"slices"
@@ -68,20 +69,22 @@ func RemoveDeadClientData(client *utils.NewClient){
 	
 }
 
+// Convert this []string to receiev [][]byte so it should be binary safe trhough out the process without conversion to string add comparison such that runes are compared instead of converting it to string
 
-func ExecuteSet(args []string, client *utils.NewClient) any{
+
+
+func ExecuteSet(args *RedisInput, client *utils.NewClient) any{
 	var stre = store.StoreHelper		
-	if  len(args) < 2 {
+	if  len(args.Args) < 2 {
 		encode , _:=  EncodeSimpleError("ERR wrong number of arguments for 'set' command")
 		return  encode
 	}
+	
 
-	val := commands.SetCommand(client,stre,args)
+	val := commands.SetCommand(client,stre,args.RawArgs)
 
-	fmt.Println("Value :", val)
 	if val {
-		encode,_ := EncodeSimpleString("OK")
-		fmt.Println("returning encoded string:", encode)	
+		encode,_ := EncodeSimpleString("OK")	
 		return  encode	
 	}else{
 		encode , _ := EncodeSimpleError(" ERR wrong number of arguments for 'set' command")
@@ -91,35 +94,27 @@ func ExecuteSet(args []string, client *utils.NewClient) any{
 
 }
 
-func ExecuteGet(args []string) string{
+func ExecuteGet(args []string) []byte{
 	var stre = store.StoreHelper		
 
 	if  len(args) < 1 {
 		 encode ,_ := EncodeSimpleError("ERR wrong number of arguments for 'get' command")
-		return  encode
+		return  []byte(encode)
 	}
-
 
 	val := commands.GetCommand(stre,args)
 
-
 	if val == nil {
 		encode := EncodeNullValues()
-		return encode
+		return []byte(encode)
 	}
 
-	var encode string
-	switch v := val.(type) {
-		case string:
-			encode, _ = EncodeBulkString(v)
-		case []string:
-			data := strings.Join(v ," ")
-			encode , _ = EncodeBulkString(data)
-		default:
-			encode = ""
+	// val is now []byte from store
+	valBytes, ok := val.([]byte)
+	if !ok {
+		return []byte(EncodeNullValues())
 	}
-
-	return encode
+	return EncodeBulkBytes(valBytes)
 }
 
 
@@ -223,7 +218,7 @@ func ExecutePing(args []string) string{
 	return encode
 }
 
-func ExecuteExpire(args []string,client *utils.NewClient) string{
+func ExecuteExpire(args [][]byte,client *utils.NewClient) string{
 	stre := store.StoreHelper
 	
 	if len(args) < 2 || len(args) > 2 {
@@ -231,7 +226,7 @@ func ExecuteExpire(args []string,client *utils.NewClient) string{
 		return encode
 	}
 
-	key := args[0]
+	key := string(args[0])
 
 	keyData := store.GetKv(stre,key)
 
@@ -240,11 +235,16 @@ func ExecuteExpire(args []string,client *utils.NewClient) string{
 		return encode
 	}
 
-	value := strings.Join(keyData.Val.([]string)," ")	
-	
-	fmtData := []string{"--ttl",args[1],"sec",keyData.Key,value}
+	value := keyData.Val
+	var byteData [][]byte
+	fmtData := []string{"--ttl",string(args[1]),"sec",keyData.Key}
+	for _, bd := range fmtData {
+		byteData = append(byteData, []byte(bd))
+	}
+	byteData = append(byteData, value)
 
-	executed := commands.SetCommand(client , stre ,fmtData)
+
+	executed := commands.SetCommand(client , stre ,byteData)
 	var encode string
 	if executed {
 		encode , _ = EncodeInteger(1)
@@ -319,9 +319,9 @@ stre := store.StoreHelper
 		return encode
 	}
 
-	kv := []string{keyData.Key, strings.Join(keyData.Val.([]string), " ")}
+	var databyte = [][]byte{[]byte(keyData.Key),keyData.Val}
 
-	executed := commands.SetCommand(client,stre,kv)
+	executed := commands.SetCommand(client,stre,databyte)
 	var encode string
 	if executed {
 		encode , _ = EncodeInteger(1)
@@ -369,19 +369,9 @@ func ExecuteRenameKey(args []string, client *utils.NewClient) string{
 		encode , _ := EncodeSimpleError("ERR no such key found")
 		return encode	
 	}
-	var value string
-	switch v := data.Val.(type) {
-		case string:
-			value = string(data.Val.(string))
-		case []string:
-			data := strings.Join(v ," ")
-			value = data
-		default:
-			value = data.Val.(string)
-	}
 
 
-	executed := commands.SetCommand(client,stre,[]string{args[1],value})
+	executed := commands.SetCommand(client,stre,[][]byte{[]byte(args[1]),data.Val})
 
 	store.DelKv(stre,args[0])
 
@@ -430,12 +420,10 @@ func ExecuteMget(args []string) string{
 		data := store.GetKv(stre,key)
 
 		if data.Val == nil {
-			valueArray = append(valueArray, data.Val)
+			valueArray = append(valueArray, nil)
 			continue
 		}
-		values := fmt.Sprintf("%v", data.Val)
-		
-		valueArray = append(valueArray, values)	
+		valueArray = append(valueArray, data.Val)	
 	}
 
 	encode , _ := EncodeArray(valueArray)
@@ -462,16 +450,7 @@ func ExecuteIntOpration(cmd string,args []string, client *utils.NewClient) strin
 		encode ,_ := EncodeSimpleError("ERR no such key found")
 		return encode
 	}
-	var value string
-	switch v := getData.Val.(type) {
-		case string:
-			value = string(getData.Val.(string))
-		case []string:
-			data := strings.Join(v ," ")
-			value = data
-		default:
-			value = getData.Val.(string)
-	}
+	value := string(getData.Val)
 
 
 
@@ -490,13 +469,13 @@ func ExecuteIntOpration(cmd string,args []string, client *utils.NewClient) strin
 
 		newval := i64+1
 		key := getData.Key
-		data := []string{key,strconv.FormatInt(newval,10)}
+		data := [][]byte{[]byte(key),[]byte(strconv.FormatInt(newval,10))}
 		commands.SetCommand(client,stre,data)
 		encode , _= EncodeInteger(newval)
 	case "decr":
 		newval := i64-1
 		key := getData.Key
-		data := []string{key,strconv.FormatInt(newval,10)}
+		data := [][]byte{[]byte(key),[]byte(strconv.FormatInt(newval,10))}
 		commands.SetCommand(client,stre,data)
 		encode , _= EncodeInteger(newval)
 
@@ -508,7 +487,7 @@ func ExecuteIntOpration(cmd string,args []string, client *utils.NewClient) strin
 		}
 		newval := i64-argInt
 		key := getData.Key
-		data := []string{key,strconv.FormatInt(newval,10)}
+		data := [][]byte{[]byte(key),[]byte(strconv.FormatInt(newval,10))}
 		commands.SetCommand(client,stre,data)
 		encode , _= EncodeInteger(newval)
 
@@ -520,7 +499,7 @@ func ExecuteIntOpration(cmd string,args []string, client *utils.NewClient) strin
 		}
 		newval := i64+argInt
 		key := getData.Key
-		data := []string{key,strconv.FormatInt(newval,10)}
+		data := [][]byte{[]byte(key),[]byte(strconv.FormatInt(newval,10))}
 		commands.SetCommand(client,stre,data)
 		encode , _= EncodeInteger(newval)
 		
@@ -590,4 +569,57 @@ func ExecuteLastSave() string{
 
 	return encode
 
+}
+
+
+func ExecuteClientname(args []string,client *utils.NewClient) string{
+	if strings.ToLower(args[0]) == "getname"{
+		if len(args) < 1 {
+		encode , _ := EncodeSimpleError("ERR wrong number of argguments for 'client|getname' command")
+			return encode 	
+		}
+		fmt.Println("Asked Client:", client.ID, " Response: ", client.Name)
+		if client.Name == "" {
+			encode := EncodeNullValues()
+			return encode
+		}
+		encode , _ := EncodeBulkString(client.Name)
+		return  encode
+	}else if strings.ToLower(args[0]) == "setname" {
+		if len(args) < 2 {
+		encode , _ := EncodeSimpleError("ERR wrong number of argguments for 'client|setname' command")
+		return encode 	
+		}
+		client.Mu.Lock()
+		client.Name = args[1]
+		client.Mu.Unlock()
+		encode , _ := EncodeSimpleString("OK")
+		return encode	
+	}else if len(args) == 3 && strings.ToLower(args[0]) == "setinfo"{
+		if strings.ToLower(args[1]) == "lib-name" {
+			client.Mu.Lock()
+			client.Library_Name = args[2]
+			client.Mu.Unlock()
+			
+			return "+OK\r\n"
+			
+		}else if strings.ToLower(args[1]) == "lib-ver"{
+			client.Mu.Lock()
+			client.Library_Ver = args[2]
+			client.Mu.Unlock()
+			return "+OK\r\n"
+		}
+	}
+	encode := EncodeNullValues()
+	return encode
+}
+
+func ExecuteCommand() string {
+	// Properly formatted RESP Array of 3 sub-arrays
+	return "*3\r\n*6\r\n$4\r\nping\r\n:2\r\n*1\r\n$7\r\nstaleok\r\n:0\r\n:0\r\n:0\r\n*6\r\n$6\r\nclient\r\n:-2\r\n*1\r\n$5\r\nadmin\r\n:0\r\n:0\r\n:0\r\n*6\r\n$7\r\ncommand\r\n:-1\r\n*2\r\n$7\r\nloading\r\n$7\r\nstaleok\r\n:0\r\n:0\r\n:0\r\n"
+}
+
+func ExecuteCommandDocs() string {
+	// A map/array payload containing 3 key-value command definitions
+	return "*6\r\n$4\r\nping\r\n*2\r\n$7\r\nsummary\r\n$21\r\nReturns PONG if alive\r\n$6\r\nclient\r\n*2\r\n$7\r\nsummary\r\n$21\r\nConnection management\r\n$7\r\ncommand\r\n*2\r\n$7\r\nsummary\r\n$22\r\nReturns command matrix\r\n"
 }

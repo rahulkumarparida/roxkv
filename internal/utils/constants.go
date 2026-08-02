@@ -41,6 +41,10 @@ var ModeSubsriber = Mode{
 }
 type NewClient struct {
 	ID           any          `json:"id"`
+	Name         string		  `json:"name"`
+	Library_Name string		  `json:"library_name"` // I a redis libraby connect we need to save the linraryname and version
+	Library_Ver  string		  `json:"library_ver"`
+	Buffer 		[]byte		  `json:"buffer"` // For client's data to be recie3
 	Role         string       `json:"role"`
 	Conn         net.Conn     `json:"-"`
 	LastUsed     time.Time    `json:"lastUsed"`

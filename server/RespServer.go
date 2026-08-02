@@ -16,7 +16,7 @@ func RespServer(stre *store.MemoryAlloc, agent *api.Client) {
 	listner, err := net.Listen("tcp", ":6973")
 
 	if err != nil {
-		fmt.Println("Server is busy and not listening at port 6973:", err)
+		fmt.Println("Server is busy and not listening at port 6973:\n", err)
 		logger.ErrorLog("error while connecting to the TCP server, port 6973 is busy")
 		return
 	}
@@ -38,7 +38,8 @@ func RespServer(stre *store.MemoryAlloc, agent *api.Client) {
 
 		mutex.Lock()
 		if len(utils.TotalConnecntions) > MaxConnections {
-			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
+			data := redisparser.EncodeBulkBytes([]byte("Max connections from the TCP server exceeded"))
+			client.Conn.Write(data)
 			client.Conn.Close()
 			continue
 		}
@@ -55,15 +56,10 @@ func HandleRespConnections(client *utils.NewClient, stre *store.MemoryAlloc, age
 
 	logger.InfoLog("Resp Client connected: " + client.ID.(string))
 
-	// msg := fmt.Sprintln("Total Users Connected: ", len(utils.TotalConnecntions))
-	// client.Conn.Write([]byte(msg))
 
 	defer client.Conn.Close()
 
-	for {
 
-		redisparser.ReadAndHandleConnection(client)
-
-	}
-
+	redisparser.ReadAndHandleConnection(client)
+	
 }
