@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/internal/commands"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
@@ -92,10 +92,13 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 }
 
 func Server() {
-	agent, err := api.ClientFromEnvironment()
-
+	config, err := abstractor.LoadConfig()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to load AI configuration: ", err)
+	}
+	provider, err := abstractor.NewProvider(*config)
+	if err != nil {
+		log.Fatal("Failed to initialize AI provider: ", err)
 	}
 
 	stre, _ := store.StoreInMemory()
@@ -113,10 +116,10 @@ func Server() {
 	store.StoreHelper = stre
 	go worker.SnapshotWorker(ctx, stre, &mutex, utils.TotalConnecntions)
 	fmt.Println("Listening CLI Connection at localhost:6969")
-	go ChatServer(stre, agent)
+	go ChatServer(stre, provider)
 	go WebServer()
-	go WebChatServer(stre, agent)
-	go RespServer(stre, agent)
+	go WebChatServer(stre, provider)
+	go RespServer(stre, provider)
 
 	for {
 

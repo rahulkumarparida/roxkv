@@ -129,3 +129,13 @@ func MetricFolder() string {
 	}
 	return metricFolder
 }
+
+
+func ConfigFolder() string{
+	HomePath, err := os.UserHomeDir()
+	metricFolder := filepath.Join(HomePath, ".roxkv", "roxconfig")
+	if HandleError("Error while fetching Home directory ", err) {
+		return ""
+	}
+	return metricFolder
+}

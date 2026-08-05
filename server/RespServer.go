@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	redisparser "github.com/rahulkumarparida/roxkv/internal/resp-parser"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-func RespServer(stre *store.MemoryAlloc, agent *api.Client) {
+func RespServer(stre *store.MemoryAlloc, provider abstractor.Provider) {
 
 	listner, err := net.Listen("tcp", ":6973")
 
@@ -46,13 +46,13 @@ func RespServer(stre *store.MemoryAlloc, agent *api.Client) {
 		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 		mutex.Unlock()
 		fmt.Println("Connected: ", client.ID)
-		go HandleRespConnections(&client, stre, agent)
+		go HandleRespConnections(&client, stre, provider)
 
 	}
 
 }
 
-func HandleRespConnections(client *utils.NewClient, stre *store.MemoryAlloc, agent *api.Client) {
+func HandleRespConnections(client *utils.NewClient, stre *store.MemoryAlloc, provider abstractor.Provider) {
 
 	logger.InfoLog("Resp Client connected: " + client.ID.(string))
 

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ollama/ollama/api"
 	"github.com/rahulkumarparida/roxkv/agents"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/agents/registry"
 	"github.com/rahulkumarparida/roxkv/agents/router"
 	"github.com/rahulkumarparida/roxkv/internal/commands"
@@ -112,14 +112,13 @@ You are aware that every tool represents a capability of RoxKV. Your job is to c
 
 Your goal is to help users interact with RoxKV naturally, accurately, and safely.`
 
-func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, client *api.Client) any {
+func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, provider abstractor.Provider) any {
 	logger.InfoLog("Master Agent called with query: " + query)
 	ctx := context.Background()
 	session := agents.GetSession("masteragent", masterSystemPrompt, user)
-	// Route tools: score every registered tool against the user query
-	// and expose only the relevant subset to the LLM.
+	// Narrowing of tools
 	tools := router.RouteTools(query, registry.AllMetadata(), router.DefaultMaxTools)
-	var finalizedTools []api.Tool
+	var finalizedTools []abstractor.GenericToolDefinition
 	if len(tools) > 6 {
 
 		finalizedTools = tools[1:6]
@@ -128,7 +127,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, c
 	}
 
 	fmt.Println("Sending it to the session runner with total ", len(tools), " tools-->")
-	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, finalizedTools, MasterInference)
+	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, provider, agents.AGENT_USED, query, finalizedTools, MasterInference)
 
 	if cerr != nil {
 		log.Fatalf("Master orchestrator API call failed: %v", cerr)
@@ -140,7 +139,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, c
 		for _, tool := range toolsToExecute {
 			fmt.Println("Executing: ", tool)
 
-			argsByte, _ := json.Marshal(tool.Function.Arguments)
+			argsByte, _ := json.Marshal(tool.Arguments)
 
 			var args masterToolQueryArgs
 			_ = json.Unmarshal(argsByte, &args)
@@ -154,7 +153,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, c
 
 			var response any
 
-			switch tool.Function.Name {
+			switch tool.Name {
 			case "get":
 				var args struct {
 					Key string `json:"key"`
@@ -309,11 +308,11 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, c
 			data := fmt.Sprintf("%v", response)
 			fmt.Println("Data Appended: ", data)
 			rawReplies = append(rawReplies, data)
-			specialistReplies = append(specialistReplies, fmt.Sprintf("[%s]\n%s", tool.Function.Name, response))
+			specialistReplies = append(specialistReplies, fmt.Sprintf("[%s]\n%s", tool.Name, response))
 		}
 		session.AppendToolResults(rawReplies...)
 
-		_, finalText, cerr := session.Run(ctx, client, agents.AGENT_USED, "Synthesize the worker outputs into the final user-facing answer. Interpret raw execution data, highlight the result that matters, and keep the reply concise unless the user requested deeper analysis.", nil, MasterInference)
+		_, finalText, cerr := session.Run(ctx, provider, agents.AGENT_USED, "Synthesize the worker outputs into the final user-facing answer. Interpret raw execution data, highlight the result that matters, and keep the reply concise unless the user requested deeper analysis.", nil, MasterInference)
 		if cerr != nil {
 			log.Fatalf("Master analysis request failed: %v", cerr)
 		}

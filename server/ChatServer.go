@@ -7,7 +7,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	master "github.com/rahulkumarparida/roxkv/agents/Master"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
@@ -16,7 +16,7 @@ import (
 
 var cmutex = sync.Mutex{}
 
-func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, agent *api.Client) {
+func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, provider abstractor.Provider) {
 
 	reader := bufio.NewReader(user.Conn)
 
@@ -47,7 +47,7 @@ func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, agent 
 		}
 
 		// Route all requests through the master orchestrator so specialist-agent results are collected and summarized centrally.
-		data := master.MasterAgent(input, stre, user, agent)
+		data := master.MasterAgent(input, stre, user, provider)
 
 		dataString := fmt.Sprintf("%v", data)
 		user.Conn.Write([]byte("\nroxai> " + dataString + "\n"))
@@ -55,7 +55,7 @@ func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, agent 
 
 }
 
-func ChatServer(stre *store.MemoryAlloc, agent *api.Client) {
+func ChatServer(stre *store.MemoryAlloc, provider abstractor.Provider) {
 
 	listner, err := net.Listen("tcp", ":6970")
 
@@ -88,7 +88,7 @@ func ChatServer(stre *store.MemoryAlloc, agent *api.Client) {
 		cmutex.Unlock()
 
 		fmt.Println("Connected: ", client.ID)
-		go handleChatConnection(&client, stre, agent)
+		go handleChatConnection(&client, stre, provider)
 
 	}
 

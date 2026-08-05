@@ -5,21 +5,23 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
 type AgentSession struct {
-	messages []api.Message `json:"messages"`
+	messages []abstractor.GenericMessage `json:"messages"`
 }
 
 var sessionRegistry sync.Map
 
+
+
 func sessionKey(agentName string, user *utils.NewClient) string {
 	return fmt.Sprintf("%s:%v", agentName, user.ID)
 }
-
+// 
 func GetSession(agentName, systemPrompt string, user *utils.NewClient) *AgentSession {
 	key := sessionKey(agentName, user)
 	if existing, ok := sessionRegistry.Load(key); ok {
@@ -27,7 +29,7 @@ func GetSession(agentName, systemPrompt string, user *utils.NewClient) *AgentSes
 	}
 
 	session := &AgentSession{
-		messages: []api.Message{
+		messages: []abstractor.GenericMessage{
 			{
 				Role:    "system",
 				Content: systemPrompt,
@@ -39,62 +41,45 @@ func GetSession(agentName, systemPrompt string, user *utils.NewClient) *AgentSes
 	return actual.(*AgentSession)
 }
 
-func (s *AgentSession) Run(ctx context.Context, client *api.Client, model, query string, tools []api.Tool, options map[string]any) ([]api.ToolCall, string, error) {
+func (s *AgentSession) Run(ctx context.Context, provider abstractor.Provider, model, query string, tools []abstractor.GenericToolDefinition, options map[string]any) ([]abstractor.GenericToolCall, string, error) {
 
-	s.messages = append(s.messages, api.Message{
+	s.messages = append(s.messages, abstractor.GenericMessage{
 		Role:    "user",
 		Content: query,
 	})
 
-	req := &api.ChatRequest{
-		Model:    model,
-		Messages: append([]api.Message(nil), s.messages...),
-		Tools:    tools,
-		Options:  options,
-	}
+	// Get provider config (assuming we have one in context or global, but the provider handles it)
+	// We'll pass a dummy config for now, or fetch the active config
+	config := *abstractor.GetConfig()
 
-	stream := false
-	req.Stream = &stream
-
-	var toolCalls []api.ToolCall
-	var assistantText string
-
-	err := client.Chat(ctx, req, func(resp api.ChatResponse) error {
-		if len(resp.Message.ToolCalls) > 0 {
-			toolCalls = resp.Message.ToolCalls
-		}
-		if resp.Message.Content != "" {
-			assistantText = resp.Message.Content
-		}
-		return nil
-	})
+	resp, err := provider.Chat(ctx, s.messages, tools, config)
 	if err != nil {
 		return nil, "", err
 	}
 
-	if len(toolCalls) > 0 {
-		s.messages = append(s.messages, api.Message{
+	if len(resp.ToolCalls) > 0 {
+		s.messages = append(s.messages, abstractor.GenericMessage{
 			Role:      "assistant",
-			ToolCalls: toolCalls,
+			ToolCalls: resp.ToolCalls,
 		})
-		return toolCalls, assistantText, nil
+		return resp.ToolCalls, resp.Text, nil
 	}
 
-	if assistantText != "" {
-		s.messages = append(s.messages, api.Message{
+	if resp.Text != "" {
+		s.messages = append(s.messages, abstractor.GenericMessage{
 			Role:    "assistant",
-			Content: assistantText,
+			Content: resp.Text,
 		})
 	}
-	logger.InfoLog("Assistant response: " + assistantText)
+	logger.InfoLog("Assistant response: " + resp.Text)
 
-	return nil, assistantText, nil
+	return nil, resp.Text, nil
 }
 
 func (s *AgentSession) AppendToolResults(results ...string) {
 
 	for _, result := range results {
-		s.messages = append(s.messages, api.Message{
+		s.messages = append(s.messages, abstractor.GenericMessage{
 			Role:    "tool",
 			Content: result,
 		})

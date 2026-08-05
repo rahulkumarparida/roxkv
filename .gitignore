@@ -3,3 +3,5 @@ node_modules
 .env
 venv
 dist/
+AIABSTRACT.md
+CONFIGURATION.md

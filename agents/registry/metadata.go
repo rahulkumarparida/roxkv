@@ -3,7 +3,7 @@ package registry
 import (
 	"sync"
 
-	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 )
 
 // ToolMetadata describes a single tool for metadata-driven routing.
@@ -13,8 +13,8 @@ type ToolMetadata struct {
 	// Name is the unique identifier matching api.ToolFunction.Name.
 	Name string `json:"name"`
 
-	// Tool is the actual api.Tool value passed to the LLM when selected.
-	Tool api.Tool `json:"tool"`
+	// Tool is the actual abstractor.GenericToolDefinition value passed to the LLM when selected.
+	Tool abstractor.GenericToolDefinition `json:"tool"`
 
 	// Category is a logical grouping such as "KV", "Monitoring",
 	// "PubSub", "Storage", or "Persistence".
@@ -64,12 +64,12 @@ func AllMetadata() []ToolMetadata {
 	return out
 }
 
-// AllTools returns every registered api.Tool value.
+// AllTools returns every registered abstractor.GenericToolDefinition value.
 // This is the fallback path when routing cannot narrow the selection.
-func AllTools() []api.Tool {
+func AllTools() []abstractor.GenericToolDefinition {
 	mu.RLock()
 	defer mu.RUnlock()
-	tools := make([]api.Tool, 0, len(registry))
+	tools := make([]abstractor.GenericToolDefinition, 0, len(registry))
 	for _, m := range registry {
 		tools = append(tools, m.Tool)
 	}

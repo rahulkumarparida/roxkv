@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/rahulkumarparida/roxkv/internal/config"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/metrics"
 	"github.com/rahulkumarparida/roxkv/internal/store"
@@ -23,10 +24,21 @@ func WebServer() {
 
 
 	fmt.Println("Listening Webserver at localhost:6971")
+	
+	if err := config.EnsureConfigDirectory(); err != nil {
+		log.Printf("Warning: failed to ensure config directory: %v", err)
+	}
 
 	router := mux.NewRouter()
 	router.HandleFunc("/healthz", HealthHandler).Methods("GET")
 	router.HandleFunc("/api/events/{name}", SseHandler).Methods("GET")
+	
+	// Configuration Endpoints
+	router.HandleFunc("/api/config/providers", config.ListProvidersHandler).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/config/provider/{provider}", config.SaveProviderHandler).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/config/provider/{provider}", config.LoadProviderHandler).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/config/provider/{provider}", config.DeleteProviderHandler).Methods("DELETE", "OPTIONS")
+	
 	err := http.ListenAndServe(":6971", router)
 
 	if err != nil {
