@@ -57,8 +57,6 @@ func EncodeBulkString(data string) (string,error){
 	return  encode, nil
 }
 
-// EncodeBulkBytes encodes raw bytes as a RESP Bulk String.
-// No UTF-8 conversion is performed. Returns raw bytes ready for TCP write.
 func EncodeBulkBytes(data []byte) []byte {
 	header := fmt.Sprintf("$%d\r\n", len(data))
 	out := make([]byte, 0, len(header)+len(data)+2)

@@ -61,15 +61,15 @@ func ReadAndHandleConnection(client *utils.NewClient) {
 		client.Buffer = append(client.Buffer, buf[:n]...)	
 		
 		for {
-			datalist, readTill ,err := HandleMultipleCommands(client, client.Buffer,n)
+			cmdList, readTill ,err := HandleMultipleCommands(client, client.Buffer,n)
 
 			if err != nil &&  err == ErrIncompleteRESP {
 				break
 			}
-			if datalist == nil {
+			if cmdList == nil {
 				break
 			}else {
-				ExecuteTokens(client,datalist,readTill)
+				ExecuteTokens(client,cmdList,readTill)
 
 				client.Mu.Lock()
 				client.Buffer = client.Buffer[readTill:]

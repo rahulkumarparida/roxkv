@@ -4,7 +4,7 @@ import "github.com/ollama/ollama/api"
 
 var MasterInference = map[string]any{
 	"num_predict": 400,
-	"num_ctx":     2048,
+	"num_ctx":     4096,
 	"temperature": 0.4,
 	"top_p":       0.9,
 }

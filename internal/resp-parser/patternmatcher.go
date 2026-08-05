@@ -58,6 +58,14 @@ func AsteriskPattern(input string , topics []string) (int,[]string){
 	}else if strings.Contains(input,":"){
 		separator = ":"
 		inputTopics = strings.Split(input,":")
+	}else {
+		// IF only * then star* , start*start , match*ng
+		idx := strings.Index(input,"*")
+		length := len(input)
+		if idx+1 == length {
+			inputTopics = append(inputTopics, input[:idx])
+			inputTopics = append(inputTopics , input[idx+1:])
+		}
 	}
 	var check bool = true
 	for _, topic := range topics {
@@ -87,3 +95,4 @@ func AsteriskPattern(input string , topics []string) (int,[]string){
 	return len(similarChannels),similarChannels
 
 }
+
