@@ -16,12 +16,10 @@ type AgentSession struct {
 
 var sessionRegistry sync.Map
 
-
-
 func sessionKey(agentName string, user *utils.NewClient) string {
 	return fmt.Sprintf("%s:%v", agentName, user.ID)
 }
-// 
+
 func GetSession(agentName, systemPrompt string, user *utils.NewClient) *AgentSession {
 	key := sessionKey(agentName, user)
 	if existing, ok := sessionRegistry.Load(key); ok {
@@ -48,12 +46,10 @@ func (s *AgentSession) Run(ctx context.Context, provider abstractor.Provider, mo
 		Content: query,
 	})
 
-	// Get provider config (assuming we have one in context or global, but the provider handles it)
-	// We'll pass a dummy config for now, or fetch the active config
-	config := *abstractor.GetConfig()
-
-	resp, err := provider.Chat(ctx, s.messages, tools, config)
+	// Execute via LLM Manager failover engine
+	resp, activeProv, err := abstractor.ExecuteWithFailover(ctx, s.messages, tools)
 	if err != nil {
+		fmt.Println("LLM Manager Failover Error:", err)
 		return nil, "", err
 	}
 
@@ -71,13 +67,12 @@ func (s *AgentSession) Run(ctx context.Context, provider abstractor.Provider, mo
 			Content: resp.Text,
 		})
 	}
-	logger.InfoLog("Assistant response: " + resp.Text)
+	logger.InfoLog("Assistant response from " + activeProv + ": " + resp.Text)
 
 	return nil, resp.Text, nil
 }
 
 func (s *AgentSession) AppendToolResults(results ...string) {
-
 	for _, result := range results {
 		s.messages = append(s.messages, abstractor.GenericMessage{
 			Role:    "tool",

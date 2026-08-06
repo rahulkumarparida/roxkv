@@ -45,15 +45,16 @@ type ProviderResponse struct {
 	Error     error
 }
 
-// ProviderConfig holds LLM provider settings loaded from model.json.
+// ProviderConfig holds LLM provider settings loaded from model.json or provider files.
 type ProviderConfig struct {
-	Provider    string  `json:"provider"`
-	Model       string  `json:"model"`
-	Endpoint    string  `json:"endpoint"`
-	APIKey      string  `json:"apikey"`
-	Temperature float64 `json:"temperature"`
-	TopP        float64 `json:"top_p"`
-	MaxTokens   int     `json:"max_tokens"`
-	Stream      bool    `json:"stream"`
-	Timeout     int     `json:"timeout"` // seconds
+	Provider     string  `json:"provider"`
+	Model        string  `json:"model"`
+	Endpoint     string  `json:"endpoint"`
+	APIKey       string  `json:"apiKey"`
+	Organization string  `json:"organization,omitempty"`
+	Temperature  float64 `json:"temperature"`
+	TopP         float64 `json:"topP"`
+	MaxTokens    int     `json:"maxTokens"`
+	Stream       bool    `json:"stream"`
+	Timeout      int     `json:"timeout"` // seconds
 }

@@ -1,11 +1,6 @@
 /**
  * @fileoverview Centralized endpoint configuration.
- * This is the ONLY place where URLs are defined.
- * 
- * ChatWebServer (Port 6972):
- * - Endpoint: POST /api/chat/
- * - Request:  {"query": "user's question"}
- * - Response: Plain text string
+ * Single source of truth for URLs and endpoints.
  */
 
 function joinUrl(base, path) {
@@ -15,8 +10,14 @@ function joinUrl(base, path) {
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:6971';
 export const CHAT_ENDPOINT = import.meta.env.VITE_CHAT_API_BASE_URL || 'http://localhost:6972';
+
 export const ENDPOINTS = {
   chat: '/api/chat/',
+  providers: '/providers',
+  providerModels: (p) => `/providers/${encodeURIComponent(p)}/models`,
+  providerConfig: (p) => `/providers/${encodeURIComponent(p)}/config`,
+  providerStats: (p) => `/providers/${encodeURIComponent(p)}/stats`,
+  selectProvider: '/providers/select',
 };
 
 export const SSE_ENDPOINTS = {

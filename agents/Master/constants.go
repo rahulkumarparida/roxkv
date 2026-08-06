@@ -431,7 +431,7 @@ func DeleteTopicTool() abstractor.GenericToolDefinition {
 		Properties: properties,
 		Required:   []string{"topic"},
 	}
-
+// 
 	return abstractor.GenericToolDefinition{
 		Type:        "function",
 		Name:        "delete_topic",

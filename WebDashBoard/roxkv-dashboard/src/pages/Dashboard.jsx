@@ -1,7 +1,7 @@
 import { Cpu, HardDrive, Download, Upload, Activity } from 'lucide-react';
 import SystemOverview from '../components/Sidebar/SystemOverview';
 import DatabaseHealth from '../components/Sidebar/DatabaseHealth';
-import SnapshotInfo from '../components/Sidebar/SnapshotInfo';
+import LLMManager from '../components/Sidebar/LLMManager';
 import ChatBox from '../components/Chat/ChatBox';
 import MetricCard from '../components/Monitor/MetricCard';
 import ActivityFeed from '../components/Activity/ActivityFeed';
@@ -58,7 +58,7 @@ export default function Dashboard() {
       <div className="flex flex-col gap-4 overflow-y-auto pr-1">
         <SystemOverview />
         <DatabaseHealth />
-        <SnapshotInfo />
+        <LLMManager />
       </div>
 
       {/* CENTER PANEL — Chat */}

@@ -10,7 +10,7 @@ import (
 
 // DefaultMaxTools is the maximum number of tools returned when routing
 // finds matches. It keeps the LLM context lean for small models.
-const DefaultMaxTools = 10
+const DefaultMaxTools = 5
 
 // stopWords are common words excluded from query matching to avoid
 // noise in the scoring process.

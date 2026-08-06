@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -130,7 +129,8 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, provider, agents.AGENT_USED, query, finalizedTools, MasterInference)
 
 	if cerr != nil {
-		log.Fatalf("Master orchestrator API call failed: %v", cerr)
+		fmt.Printf("[MasterAgent] Orchestrator LLM call error: %v\n", cerr)
+		return cerr.Error()
 	}
 
 	if len(toolsToExecute) > 0 {
@@ -314,7 +314,11 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 
 		_, finalText, cerr := session.Run(ctx, provider, agents.AGENT_USED, "Synthesize the worker outputs into the final user-facing answer. Interpret raw execution data, highlight the result that matters, and keep the reply concise unless the user requested deeper analysis.", nil, MasterInference)
 		if cerr != nil {
-			log.Fatalf("Master analysis request failed: %v", cerr)
+			fmt.Printf("[MasterAgent] Analysis LLM request error: %v\n", cerr)
+			if len(specialistReplies) > 0 {
+				return strings.Join(specialistReplies, "\n\n")
+			}
+			return cerr.Error()
 		}
 
 		if strings.TrimSpace(finalText) != "" {

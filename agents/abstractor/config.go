@@ -85,8 +85,8 @@ func GetConfig() *ProviderConfig {
 		defCfg := DefaultConfig()
 		return &defCfg
 	}
-	copy := *cachedConfig
-	return &copy
+	copycon := *cachedConfig
+	return &copycon
 }
 
 // SaveConfig writes the config to disk and updates the cache.

@@ -28,6 +28,14 @@ export default defineConfig(({ mode }) => {
           target: chatApiBaseUrl,
           changeOrigin: true,
         },
+        '/providers': {
+          target: chatApiBaseUrl,
+          changeOrigin: true,
+        },
+        '/api/providers': {
+          target: chatApiBaseUrl,
+          changeOrigin: true,
+        },
       },
     },
     preview: {
