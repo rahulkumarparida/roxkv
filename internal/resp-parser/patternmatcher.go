@@ -40,6 +40,11 @@ func PatternChecker(input string, topics []string) (int,[]string){
 
 	if strings.Contains(input,"*"){
 		return AsteriskPattern(input,topics)
+	}else if strings.Contains(input,"?"){
+		return  QuestionMarkPattern(input,topics)
+	}else if strings.Contains(input,"[") && strings.Contains(input,"]"){
+		fmt.Println("Executing [] Brackets")
+		return CharacterMatchingPattern(input,topics)
 	}
 
 
@@ -95,4 +100,68 @@ func AsteriskPattern(input string , topics []string) (int,[]string){
 	return len(similarChannels),similarChannels
 
 }
+
+
+
+// (Single Character): Matches exactly one character.Example: h?llo matches hello, hallo, and hxllo
+
+func QuestionMarkPattern(input string, topics []string) (int,[]string){
+
+	// Shoiudl be able to complete these pattern ?ello , h?ello , Hell?
+	var similarTopic []string
+	var inputTopics []string
+	var val = false
+	if strings.Contains(input,"."){
+		
+		inputTopics = strings.Split(input,".")	
+	}else if strings.Contains(input,":"){
+		
+		inputTopics = strings.Split(input,":")
+	}else {
+		// IF only * then star* , start*start , match*ng
+		idx := strings.Index(input,"?")
+		length := len(input)
+		if idx+1 == length {
+			inputTopics = append(inputTopics, input[:idx])
+			inputTopics = append(inputTopics , input[idx+1:])
+		}
+	}
+	for _, topic := range topics {
+		for _, inpTopic := range inputTopics {
+			if strings.Contains(topic,inpTopic) {
+				val = true
+			}else{
+				val = false
+			}
+		}
+		if val {
+			similarTopic = append(similarTopic, topic)
+		}
+	}
+	return len(similarTopic),similarTopic
+
+}
+
+// [abc] (Character Classes): Matches any single character enclosed inside the brackets.
+//  Example: h[ae]llo matches hello and hallo, but won't match hillo
+func CharacterMatchingPattern(input string,topics []string) (int,[]string){
+	var similarTopic []string
+	openBracIdx := strings.Index(input,"[")
+	closeBracIdx := strings.Index(input,"]")
+	requiredchar := input[openBracIdx:closeBracIdx]
+	fmt.Println("required:",requiredchar)
+	for _, topic := range topics {
+
+		for _, char := range requiredchar {
+			if (input[:openBracIdx]+string(char)+input[closeBracIdx+1:]) == topic{
+				fmt.Println("Topic Matched",topic)
+				similarTopic = append(similarTopic, topic)
+			}
+		}
+	}
+
+
+	return len(similarTopic),similarTopic
+}
+
 
