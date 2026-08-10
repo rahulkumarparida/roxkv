@@ -19,7 +19,11 @@ type OllamaProvider struct {
 
 // NewOllamaProvider creates a new instance of OllamaProvider.
 func NewOllamaProvider(config ProviderConfig) (*OllamaProvider, error) {
-	parsedURL, err := url.Parse(config.Endpoint)
+	endpoint := config.Endpoint
+	if strings.TrimSpace(endpoint) == "" {
+		endpoint = "http://localhost:11434"
+	}
+	parsedURL, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("invalid endpoint URL: %w", err)
 	}

@@ -20,7 +20,7 @@ import (
 )
 
 type masterToolQueryArgs struct {
-	Query string `json:"query"`
+	Query []string `json:"query"`
 }
 
 // Pubsub
@@ -125,8 +125,13 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 		finalizedTools = tools
 	}
 
+	modelName := ""
+	if activeCfg := abstractor.GetConfig(); activeCfg != nil {
+		modelName = activeCfg.Model
+	}
+
 	fmt.Println("Sending it to the session runner with total ", len(tools), " tools-->")
-	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, provider, agents.AGENT_USED, query, finalizedTools, MasterInference)
+	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, provider, modelName, query, finalizedTools, MasterInference)
 
 	if cerr != nil {
 		fmt.Printf("[MasterAgent] Orchestrator LLM call error: %v\n", cerr)
@@ -134,7 +139,8 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 	}
 
 	if len(toolsToExecute) > 0 {
-		var rawReplies []string
+		fmt.Println("Toold to Execute:",toolsToExecute[0])
+		var rawReplies []abstractor.GenericToolResult
 		var specialistReplies []string
 		for _, tool := range toolsToExecute {
 			fmt.Println("Executing: ", tool)
@@ -145,11 +151,6 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 			_ = json.Unmarshal(argsByte, &args)
 			fmt.Println("Arguments Here :", args)
 
-			queryText := strings.TrimSpace(args.Query)
-
-			if queryText == "" {
-				queryText = "Please inspect the relevant state for this request."
-			}
 
 			var response any
 
@@ -305,14 +306,18 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 			if response == "" {
 				response = "No specialist response was produced."
 			}
-			data := fmt.Sprintf("%v", response)
+			data := abstractor.GenericToolResult{
+				ID: tool.ID,
+				Name: tool.Name,
+				Content: response.([]string),
+			}
 			fmt.Println("Data Appended: ", data)
 			rawReplies = append(rawReplies, data)
 			specialistReplies = append(specialistReplies, fmt.Sprintf("[%s]\n%s", tool.Name, response))
 		}
 		session.AppendToolResults(rawReplies...)
 
-		_, finalText, cerr := session.Run(ctx, provider, agents.AGENT_USED, "Synthesize the worker outputs into the final user-facing answer. Interpret raw execution data, highlight the result that matters, and keep the reply concise unless the user requested deeper analysis.", nil, MasterInference)
+		_, finalText, cerr := session.Run(ctx, provider, modelName, "Synthesize the worker outputs into the final user-facing answer. Interpret raw execution data, highlight the result that matters, and keep the reply concise unless the user requested deeper analysis.", nil, MasterInference)
 		if cerr != nil {
 			fmt.Printf("[MasterAgent] Analysis LLM request error: %v\n", cerr)
 			if len(specialistReplies) > 0 {

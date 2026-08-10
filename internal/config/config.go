@@ -61,7 +61,7 @@ func GetConfigPath(provider string) (string, error) {
 	if provider == "" || strings.Contains(provider, "..") || strings.Contains(provider, "/") {
 		return "", fmt.Errorf("invalid provider name: %s", provider)
 	}
-	return filepath.Join(dir, fmt.Sprintf("%s.json", provider)), nil
+	return filepath.Join(dir,"model.json"), nil
 }
 
 // SaveProvider saves the given ProviderConfig to the filesystem.
@@ -112,7 +112,6 @@ func LoadProvider(provider string) (*ProviderConfig, error) {
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON config for %s: %w", provider, err)
 	}
-
 	return &config, nil
 }
 

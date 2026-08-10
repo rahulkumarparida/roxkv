@@ -3,6 +3,7 @@ package agents
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/rahulkumarparida/roxkv/agents/abstractor"
@@ -11,6 +12,7 @@ import (
 )
 
 type AgentSession struct {
+	mu       sync.Mutex
 	messages []abstractor.GenericMessage `json:"messages"`
 }
 
@@ -40,18 +42,25 @@ func GetSession(agentName, systemPrompt string, user *utils.NewClient) *AgentSes
 }
 
 func (s *AgentSession) Run(ctx context.Context, provider abstractor.Provider, model, query string, tools []abstractor.GenericToolDefinition, options map[string]any) ([]abstractor.GenericToolCall, string, error) {
-
+	s.mu.Lock()
 	s.messages = append(s.messages, abstractor.GenericMessage{
 		Role:    "user",
 		Content: query,
 	})
+	msgSnapshot := make([]abstractor.GenericMessage, len(s.messages))
+	copy(msgSnapshot, s.messages)
+	s.mu.Unlock()
 
 	// Execute via LLM Manager failover engine
-	resp, activeProv, err := abstractor.ExecuteWithFailover(ctx, s.messages, tools)
+	fmt.Println("Model:", model, provider)
+	resp, activeProv, err := abstractor.ExecuteWithFailover(ctx, provider, model, options, msgSnapshot, tools)
 	if err != nil {
 		fmt.Println("LLM Manager Failover Error:", err)
 		return nil, "", err
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	if len(resp.ToolCalls) > 0 {
 		s.messages = append(s.messages, abstractor.GenericMessage{
@@ -72,11 +81,16 @@ func (s *AgentSession) Run(ctx context.Context, provider abstractor.Provider, mo
 	return nil, resp.Text, nil
 }
 
-func (s *AgentSession) AppendToolResults(results ...string) {
-	for _, result := range results {
+func (s *AgentSession) AppendToolResults(results ...abstractor.GenericToolResult) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, res := range results {
+		content := strings.Join(res.Content,",")
 		s.messages = append(s.messages, abstractor.GenericMessage{
-			Role:    "tool",
-			Content: result,
+			Role:       "tool",
+			Content:    content,
+			ToolCallID: res.ID,
+			ToolName:   res.Name,
 		})
 	}
 }

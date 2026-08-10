@@ -38,6 +38,9 @@ func (p *GeminiProvider) Name() string {
 }
 
 func (p *GeminiProvider) Chat(ctx context.Context, messages []GenericMessage, tools []GenericToolDefinition, config ProviderConfig) (*ProviderResponse, error) {
+	if config.Endpoint == "" {
+		config.Endpoint = "https://generativelanguage.googleapis.com"
+	}
 	var systemInstruction *map[string]any
 	var contents []map[string]any
 
@@ -73,16 +76,19 @@ func (p *GeminiProvider) Chat(ctx context.Context, messages []GenericMessage, to
 				"parts": parts,
 			})
 		} else if msg.Role == "tool" {
-			for _, tc := range msg.ToolCalls {
-				parts = append(parts, map[string]any{
-					"functionResponse": map[string]any{
-						"name": tc.Name,
-						"response": map[string]any{
-							"content": msg.Content,
-						},
-					},
-				})
+			toolName := msg.ToolName
+			if toolName == "" {
+				toolName = "tool"
 			}
+			parts = append(parts, map[string]any{
+				"functionResponse": map[string]any{
+					"name": toolName,
+					"response": map[string]any{
+						"name":    toolName,
+						"content": msg.Content,
+					},
+				},
+			})
 			contents = append(contents, map[string]any{
 				"role":  "user",
 				"parts": parts,
@@ -93,9 +99,9 @@ func (p *GeminiProvider) Chat(ctx context.Context, messages []GenericMessage, to
 	reqBody := map[string]any{
 		"contents": contents,
 		"generationConfig": map[string]any{
-			"temperature":     p.config.Temperature,
-			"topP":            p.config.TopP,
-			"maxOutputTokens": p.config.MaxTokens,
+			"temperature":     config.Temperature,
+			"topP":            config.TopP,
+			"maxOutputTokens": config.MaxTokens,
 		},
 	}
 
@@ -112,7 +118,7 @@ func (p *GeminiProvider) Chat(ctx context.Context, messages []GenericMessage, to
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", p.config.Endpoint, p.config.Model, p.config.APIKey)
+	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", config.Endpoint, config.Model, config.APIKey)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)

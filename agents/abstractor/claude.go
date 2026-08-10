@@ -73,16 +73,19 @@ func (p *ClaudeProvider) Name() string {
 }
 
 func (p *ClaudeProvider) Chat(ctx context.Context, messages []GenericMessage, tools []GenericToolDefinition, config ProviderConfig) (*ProviderResponse, error) {
-	maxTokens := p.config.MaxTokens
+	if config.Endpoint == "" {
+		config.Endpoint = "https://api.anthropic.com"
+	}
+	maxTokens := config.MaxTokens
 	if maxTokens == 0 {
 		maxTokens = 1024
 	}
 
 	reqBody := claudeRequest{
-		Model:       p.config.Model,
+		Model:       config.Model,
 		MaxTokens:   maxTokens,
-		Temperature: p.config.Temperature,
-		TopP:        p.config.TopP,
+		Temperature: config.Temperature,
+		TopP:        config.TopP,
 	}
 
 	var systemPrompts []string
@@ -95,10 +98,14 @@ func (p *ClaudeProvider) Chat(ctx context.Context, messages []GenericMessage, to
 			}
 			if m.Role == "tool" {
 				msg.Role = "user"
+				toolUseID := m.ToolCallID
+				if toolUseID == "" {
+					toolUseID = "toolu_0"
+				}
 				msg.Content = []claudeContentBlock{
 					{
 						Type:      "tool_result",
-						ToolUseID: "call_default", // Placeholder for deterministic ID
+						ToolUseID: toolUseID,
 						Content:   m.Content,
 					},
 				}
@@ -142,14 +149,14 @@ func (p *ClaudeProvider) Chat(ctx context.Context, messages []GenericMessage, to
 		return nil, NewProviderError("claude", 0, fmt.Sprintf("failed to marshal request: %v", err), err)
 	}
 
-	url := fmt.Sprintf("%s/v1/messages", p.config.Endpoint)
+	url := fmt.Sprintf("%s/v1/messages", config.Endpoint)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, NewProviderError("claude", 0, fmt.Sprintf("failed to create request: %v", err), err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", p.config.APIKey)
+	req.Header.Set("x-api-key", config.APIKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
 
 	resp, err := p.client.Do(req)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -19,7 +20,7 @@ type GroqProvider struct {
 // NewGroqProvider creates a new instance of GroqProvider.
 func NewGroqProvider(config ProviderConfig) (*GroqProvider, error) {
 	if config.Endpoint == "" {
-		config.Endpoint = "https://api.groq.com/openai"
+		config.Endpoint = "https://api.groq.com/openai/v1"
 	}
 	timeout := time.Duration(config.Timeout) * time.Second
 	if timeout == 0 {
@@ -44,6 +45,16 @@ func (p *GroqProvider) Chat(ctx context.Context, messages []GenericMessage, tool
 			"role":    msg.Role,
 			"content": msg.Content,
 		}
+		if msg.Role == "tool" {
+			toolCallID := msg.ToolCallID
+			if toolCallID == "" {
+				toolCallID = "call_0"
+			}
+			m["tool_call_id"] = toolCallID
+			if msg.ToolName != "" {
+				m["name"] = msg.ToolName
+			}
+		}
 		if len(msg.ToolCalls) > 0 {
 			tcs := make([]map[string]any, 0, len(msg.ToolCalls))
 			for _, tc := range msg.ToolCalls {
@@ -63,11 +74,11 @@ func (p *GroqProvider) Chat(ctx context.Context, messages []GenericMessage, tool
 	}
 
 	reqBody := map[string]any{
-		"model":       p.config.Model,
+		"model":       config.Model,
 		"messages":    groqMsgs,
-		"temperature": p.config.Temperature,
-		"top_p":       p.config.TopP,
-		"max_tokens":  p.config.MaxTokens,
+		"temperature": config.Temperature,
+		"top_p":       config.TopP,
+		"max_tokens":  config.MaxTokens,
 	}
 
 	if len(tools) > 0 {
@@ -83,13 +94,21 @@ func (p *GroqProvider) Chat(ctx context.Context, messages []GenericMessage, tool
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1/chat/completions", p.config.Endpoint)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	endpoint := strings.TrimRight(config.Endpoint, "/")
+	if endpoint == "" {
+		endpoint = "https://api.groq.com/openai/v1"
+	}
+	endpoint = strings.TrimSuffix(endpoint, "/chat/completions")
+	endpoint = strings.TrimSuffix(endpoint, "/v1")
+	endpoint = strings.TrimRight(endpoint, "/")
+	apiURL := fmt.Sprintf("%s/v1/chat/completions", endpoint)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+p.config.APIKey)
+	req.Header.Set("Authorization", "Bearer "+config.APIKey)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -134,7 +153,9 @@ func (p *GroqProvider) Chat(ctx context.Context, messages []GenericMessage, tool
 	for _, tc := range msg.ToolCalls {
 		var args map[string]any
 		if tc.Function.Arguments != "" {
-			_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
+			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+				return nil, NewProviderError("groq", 0, fmt.Sprintf("malformed tool call arguments JSON for %s: %v", tc.Function.Name, err), err)
+			}
 		}
 		responseToolCalls = append(responseToolCalls, GenericToolCall{
 			ID:        tc.ID,

@@ -31,9 +31,9 @@ func DefaultConfig() ProviderConfig {
 	}
 }
 
-// configPath returns the absolute path to model.json.
+// ConfigPath returns the absolute path to model.json.
 // It resolves relative to the executable's directory, walking up to find the project root.
-func configPath() string {
+func ConfigPath() string {
 	// Try relative to current working directory first
 	configwd:= utils.ConfigFolder()
 	
@@ -45,7 +45,7 @@ func configPath() string {
 func LoadConfig() (*ProviderConfig, error) {
 	var loadErr error
 	configOnce.Do(func() {
-		path := configPath()
+		path := ConfigPath()
 
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -62,6 +62,7 @@ func LoadConfig() (*ProviderConfig, error) {
 			loadErr = fmt.Errorf("failed to read config: %w", err)
 			return
 		}
+		fmt.Println("Model Data:",string(data))
 
 		var cfg ProviderConfig
 		if err := json.Unmarshal(data, &cfg); err != nil {
@@ -94,7 +95,7 @@ func SaveConfig(cfg ProviderConfig) error {
 	configMu.Lock()
 	defer configMu.Unlock()
 
-	path := configPath()
+	path := ConfigPath()
 	if err := writeConfigToDisk(path, &cfg); err != nil {
 		return err
 	}
@@ -107,7 +108,7 @@ func ReloadConfig() (*ProviderConfig, error) {
 	configMu.Lock()
 	defer configMu.Unlock()
 
-	path := configPath()
+	path := ConfigPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config: %w", err)

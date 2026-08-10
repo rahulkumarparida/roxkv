@@ -158,10 +158,58 @@ func notifyProviderChange(newProvider, newModel string) {
 	}
 }
 
+func applyOptions(cfg *ProviderConfig, options map[string]any) {
+	if options == nil {
+		return
+	}
+	if temp, ok := options["temperature"]; ok {
+		switch v := temp.(type) {
+		case float64:
+			cfg.Temperature = v
+		case float32:
+			cfg.Temperature = float64(v)
+		case int:
+			cfg.Temperature = float64(v)
+		}
+	}
+	if topP, ok := options["top_p"]; ok {
+		switch v := topP.(type) {
+		case float64:
+			cfg.TopP = v
+		case float32:
+			cfg.TopP = float64(v)
+		case int:
+			cfg.TopP = float64(v)
+		}
+	}
+	if maxTokens, ok := options["max_tokens"]; ok {
+		switch v := maxTokens.(type) {
+		case int:
+			cfg.MaxTokens = v
+		case float64:
+			cfg.MaxTokens = int(v)
+		}
+	} else if numPredict, ok := options["num_predict"]; ok {
+		switch v := numPredict.(type) {
+		case int:
+			cfg.MaxTokens = v
+		case float64:
+			cfg.MaxTokens = int(v)
+		}
+	}
+}
+
 // ExecuteWithFailover is the central entry point for LLM chat invocations with automatic retry & failover.
-func ExecuteWithFailover(ctx context.Context, messages []GenericMessage, tools []GenericToolDefinition) (*ProviderResponse, string, error) {
-	activeCfg := GetConfig()
-	initialActive := strings.ToLower(strings.TrimSpace(activeCfg.Provider))
+func ExecuteWithFailover(ctx context.Context, initialProvider Provider, model string, options map[string]any, messages []GenericMessage, tools []GenericToolDefinition) (*ProviderResponse, string, error) {
+	var initialActive string
+	if initialProvider != nil && strings.TrimSpace(initialProvider.Name()) != "" {
+		initialActive = strings.ToLower(strings.TrimSpace(initialProvider.Name()))
+	} else {
+		activeCfg := GetConfig()
+		if activeCfg != nil {
+			initialActive = strings.ToLower(strings.TrimSpace(activeCfg.Provider))
+		}
+	}
 
 	sequence := GetFailoverSequence(initialActive)
 	if len(sequence) == 0 {
@@ -175,17 +223,32 @@ func ExecuteWithFailover(ctx context.Context, messages []GenericMessage, tools [
 
 	var attemptedProviders []string
 
-	for idx, providerName := range sequence {
+	for _, providerName := range sequence {
 		attemptedProviders = append(attemptedProviders, providerName)
 		fmt.Printf("\n[LLM Manager]\nCurrent Provider: %s\nSending request...\n", providerName)
 
-		pConfig := *activeCfg
+		var pConfig ProviderConfig
+		activeCfg := GetConfig()
 		if loaded, err := config.LoadProvider(providerName); err == nil && loaded != nil {
 			pConfig = MapToAbstractorConfig(*loaded)
+			if activeCfg != nil && strings.EqualFold(activeCfg.Provider, providerName) {
+				if pConfig.APIKey == "" {
+					pConfig.APIKey = activeCfg.APIKey
+				}
+				if pConfig.Endpoint == "" {
+					pConfig.Endpoint = activeCfg.Endpoint
+				}
+				if pConfig.Model == "" {
+					pConfig.Model = activeCfg.Model
+				}
+			}
 		} else {
+			if activeCfg != nil {
+				pConfig = *activeCfg
+			}
 			pConfig.Provider = providerName
 			models, ok := GetSupportedModels(providerName)
-			if ok && len(models) > 0 {
+			if ok && len(models) > 0 && pConfig.Model == "" {
 				pConfig.Model = models[0]
 			}
 			if providerName == "ollama" && pConfig.Endpoint == "" {
@@ -193,10 +256,22 @@ func ExecuteWithFailover(ctx context.Context, messages []GenericMessage, tools [
 			}
 		}
 
-		providerImpl, err := NewProvider(pConfig)
-		if err != nil {
-			fmt.Printf("[LLM Manager]\nFailed to instantiate provider %s: %v\nNon-retryable error. Switching immediately to next provider...\n", providerName, err)
-			continue
+		if strings.EqualFold(providerName, initialActive) && strings.TrimSpace(model) != "" {
+			pConfig.Model = strings.TrimSpace(model)
+		}
+
+		applyOptions(&pConfig, options)
+
+		var providerImpl Provider
+		var err error
+		if initialProvider != nil && strings.EqualFold(initialProvider.Name(), providerName) {
+			providerImpl = initialProvider
+		} else {
+			providerImpl, err = NewProvider(pConfig)
+			if err != nil {
+				fmt.Printf("[LLM Manager]\nFailed to instantiate provider %s: %v\nNon-retryable error. Switching immediately to next provider...\n", providerName, err)
+				continue
+			}
 		}
 
 		var lastErr error
@@ -215,18 +290,6 @@ func ExecuteWithFailover(ctx context.Context, messages []GenericMessage, tools [
 			resp, lastErr = providerImpl.Chat(ctx, messages, tools, pConfig)
 			if lastErr == nil && resp != nil {
 				fmt.Println("\nSuccess.")
-
-				// If provider switched due to failover, persist new active provider
-				if !strings.EqualFold(providerName, initialActive) {
-					fmt.Printf("[LLM Manager]\nSwitching provider to %s...\nUpdating UI...\n", providerName)
-
-					_ = SaveConfig(pConfig)
-					_ = config.SaveProvider(providerName, MapFromAbstractorConfig(pConfig))
-					fmt.Printf("[LLM Manager]\nCurrent Provider Updated -> %s\n", providerName)
-
-					notifyProviderChange(providerName, pConfig.Model)
-				}
-
 				IncrementQueryCount(providerName)
 				return resp, providerName, nil
 			}
@@ -246,10 +309,6 @@ func ExecuteWithFailover(ctx context.Context, messages []GenericMessage, tools [
 				time.Sleep(2 * time.Second)
 			} else if attempt == 3 {
 				fmt.Println("\nProvider unavailable.")
-				if idx < len(sequence)-1 {
-					capitalizedNext := strings.Title(sequence[idx+1])
-					fmt.Printf("\nSearching for next configured provider...\n\nFound: %s\n\nSwitching provider...\n", capitalizedNext)
-				}
 				break
 			}
 		}

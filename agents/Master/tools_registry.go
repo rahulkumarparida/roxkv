@@ -409,7 +409,7 @@ func init() {
 		Tool:        BroadcastEverywhereTool(),
 		Category:    "PubSub",
 		Description: "Publish one message across all topics",
-		Keywords:    []string{"broadcast", "everywhere", "all", "global", "message"},
+		Keywords:    []string{"broadcast", "send" ,"everywhere", "all", "global", "message"},
 		Synonyms:    []string{"announce", "blast", "flood"},
 		Examples: []string{
 			"broadcast everywhere",

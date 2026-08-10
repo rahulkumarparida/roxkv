@@ -86,12 +86,15 @@ func (p *OpenAIProvider) Name() string {
 
 // Chat sends a chat completion request to OpenAI.
 func (p *OpenAIProvider) Chat(ctx context.Context, messages []GenericMessage, tools []GenericToolDefinition, config ProviderConfig) (*ProviderResponse, error) {
+	if config.Endpoint == "" {
+		config.Endpoint = "https://api.openai.com"
+	}
 	reqBody := openAIRequest{
-		Model:       p.config.Model,
-		Temperature: p.config.Temperature,
-		TopP:        p.config.TopP,
-		MaxTokens:   p.config.MaxTokens,
-		Stream:      p.config.Stream,
+		Model:       config.Model,
+		Temperature: config.Temperature,
+		TopP:        config.TopP,
+		MaxTokens:   config.MaxTokens,
+		Stream:      config.Stream,
 	}
 
 	for _, m := range messages {
@@ -100,7 +103,11 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []GenericMessage, to
 			Content: m.Content,
 		}
 		if m.Role == "tool" {
-			msg.ToolCallID = "call_default"
+			toolCallID := m.ToolCallID
+			if toolCallID == "" {
+				toolCallID = "call_0"
+			}
+			msg.ToolCallID = toolCallID
 		}
 		if len(m.ToolCalls) > 0 {
 			for _, tc := range m.ToolCalls {
@@ -136,14 +143,14 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []GenericMessage, to
 		return nil, NewProviderError("openai", 0, fmt.Sprintf("failed to marshal request: %v", err), err)
 	}
 
-	url := fmt.Sprintf("%s/v1/chat/completions", p.config.Endpoint)
+	url := fmt.Sprintf("%s/v1/chat/completions", config.Endpoint)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, NewProviderError("openai", 0, fmt.Sprintf("failed to create request: %v", err), err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", p.config.APIKey))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", config.APIKey))
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -174,7 +181,7 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []GenericMessage, to
 		var args map[string]any
 		if tc.Function.Arguments != "" {
 			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-				// ignore invalid args
+				return nil, NewProviderError("openai", 0, fmt.Sprintf("malformed tool call arguments JSON for %s: %v", tc.Function.Name, err), err)
 			}
 		}
 		providerResp.ToolCalls = append(providerResp.ToolCalls, GenericToolCall{

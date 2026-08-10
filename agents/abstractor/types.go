@@ -3,9 +3,18 @@ package abstractor
 // GenericMessage represents a single message in a conversation,
 // independent of any LLM provider's SDK types.
 type GenericMessage struct {
-	Role      string            `json:"role"`      // "system", "user", "assistant", "tool"
-	Content   string            `json:"content"`
-	ToolCalls []GenericToolCall `json:"tool_calls,omitempty"` // only set when Role == "assistant"
+	Role       string            `json:"role"`                  // "system", "user", "assistant", "tool"
+	Content    string            `json:"content"`
+	ToolCalls  []GenericToolCall `json:"tool_calls,omitempty"`  // only set when Role == "assistant"
+	ToolCallID string            `json:"tool_call_id,omitempty"` // set when Role == "tool"
+	ToolName   string            `json:"tool_name,omitempty"`    // set when Role == "tool"
+}
+
+// GenericToolResult encapsulates the output of executing a tool call.
+type GenericToolResult struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Content []string `json:"content"`
 }
 
 // GenericToolCall represents a tool invocation request returned by an LLM.
