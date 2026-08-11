@@ -160,6 +160,10 @@ func Broker(client *utils.NewClient, topic string, msg string) {
 			continue
 		}else{
 			fmt.Println("Sending them msg:",msg)
+			if client.Initiator == utils.RedisSource {
+				continue
+			}
+
 			channel.Wg.Add(1)
 			go DeliverMessage(sub, "roxkv> " +msg+"\n", &channel.Wg)
 		}	

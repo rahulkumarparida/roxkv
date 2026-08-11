@@ -62,7 +62,6 @@ func LoadConfig() (*ProviderConfig, error) {
 			loadErr = fmt.Errorf("failed to read config: %w", err)
 			return
 		}
-		fmt.Println("Model Data:",string(data))
 
 		var cfg ProviderConfig
 		if err := json.Unmarshal(data, &cfg); err != nil {

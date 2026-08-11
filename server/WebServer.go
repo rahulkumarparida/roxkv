@@ -82,7 +82,6 @@ func SseHandler(w http.ResponseWriter, r *http.Request) {
 		select {
 
 		case <-clientGone:
-			fmt.Println("Client disconnected")
 			return
 
 		case <-t.C:

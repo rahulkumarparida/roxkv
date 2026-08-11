@@ -61,7 +61,7 @@ func GetConfigPath(provider string) (string, error) {
 	if provider == "" || strings.Contains(provider, "..") || strings.Contains(provider, "/") {
 		return "", fmt.Errorf("invalid provider name: %s", provider)
 	}
-	return filepath.Join(dir,"model.json"), nil
+	return filepath.Join(dir,fmt.Sprintf("%v",provider)), nil
 }
 
 // SaveProvider saves the given ProviderConfig to the filesystem.

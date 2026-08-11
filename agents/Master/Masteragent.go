@@ -309,7 +309,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 			data := abstractor.GenericToolResult{
 				ID: tool.ID,
 				Name: tool.Name,
-				Content: response.([]string),
+				Content: []string{response.(string)},
 			}
 			fmt.Println("Data Appended: ", data)
 			rawReplies = append(rawReplies, data)

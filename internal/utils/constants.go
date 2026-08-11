@@ -22,6 +22,11 @@ type Mode struct {
 	PTopic []string
 }
 
+type InitSource struct {
+	Source string
+	JoinedAt time.Time
+}
+
 const (
 	RoleSystem Role = "system"
 	RoleClient Role = "client"
@@ -39,6 +44,16 @@ var ModeSubsriber = Mode{
 	Topic: []string{},
 	PTopic: []string{},
 }
+
+var DefaultSource = InitSource{
+	Source: "local",
+	JoinedAt: time.Now(),
+}
+
+var RedisSource = InitSource{
+	Source: "redis",
+	JoinedAt: time.Now(),
+}
 type NewClient struct {
 	ID           any          `json:"id"`
 	Name         string		  `json:"name"`
@@ -52,6 +67,7 @@ type NewClient struct {
 	Mu           sync.RWMutex `json:"-"`
 	Interactions int          `json:"interactions"`
 	Mode 		 Mode		  `json:"mode"`
+	Initiator    InitSource   `json:"initiator"`
 }
 
 type ClientMetaData struct {
@@ -76,6 +92,7 @@ func CreateClient(conn net.Conn, role string) *NewClient {
 		Mu:           sync.RWMutex{},
 		Interactions: 1,
 		Mode: ModeDefault,
+		Initiator: DefaultSource,
 	}
 }
 

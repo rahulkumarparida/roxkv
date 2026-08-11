@@ -25,31 +25,6 @@ export default function LLMManager() {
   const [loadingModels, setLoadingModels] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Initial load and sync listeners
-  useEffect(() => {
-    loadProvidersList();
-    refreshActiveStats('ollama');
-
-    const handleProviderChange = () => {
-      refreshActiveStats();
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('llm_provider_changed', handleProviderChange);
-    }
-
-    // Auto refresh every 4 seconds to catch automatic failovers instantly
-    const interval = setInterval(() => {
-      refreshActiveStats();
-    }, 4000);
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('llm_provider_changed', handleProviderChange);
-      }
-      clearInterval(interval);
-    };
-  }, []);
 
   const loadProvidersList = async () => {
     try {
@@ -65,6 +40,8 @@ export default function LLMManager() {
   const refreshActiveStats = async (providerToFetch) => {
     try {
       const target = providerToFetch || currentProvider || 'ollama';
+      console.log("Target :",target);
+      
       const stats = await fetchProviderStats(target);
       if (stats) {
         if (stats.currentProvider && stats.currentProvider !== currentProvider) {
@@ -114,14 +91,18 @@ export default function LLMManager() {
   };
 
   const handleProviderChange = async (newProvider) => {
+    
     setSelectedProviderInput(newProvider);
     const fetchedModels = await loadModelsForProvider(newProvider);
+    console.log("Fetch:",fetchedModels);
+    
     const newModel = fetchedModels.length > 0 ? fetchedModels[0] : '';
     setSelectedModelInput(newModel);
 
     try {
       await selectActiveProvider(newProvider, newModel);
       await refreshActiveStats(newProvider);
+      await loadModelsForProvider(newProvider)
     } catch (err) {
       console.error('Failed to set active provider:', err);
     }
@@ -132,10 +113,34 @@ export default function LLMManager() {
     try {
       await selectActiveProvider(selectedProviderInput, newModel);
       await refreshActiveStats(selectedProviderInput);
+       await loadModelsForProvider(selectedProviderInput)
     } catch (err) {
       console.error('Failed to set active model:', err);
     }
   };
+
+
+
+
+  // Initial load and sync listeners
+  useEffect(() => {
+    loadProvidersList();
+    loadModelsForProvider(currentProvider)
+    const handleProviderChange = () => {
+      refreshActiveStats();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('llm_provider_changed', handleProviderChange);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('llm_provider_changed', handleProviderChange);
+      }
+
+    };
+  }, []);
 
   return (
     <GlassCard className="p-4" hover>

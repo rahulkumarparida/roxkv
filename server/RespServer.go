@@ -37,6 +37,7 @@ func RespServer(stre *store.MemoryAlloc, provider abstractor.Provider) {
 		client := *utils.CreateClient(conn, "client")
 
 		mutex.Lock()
+		client.Initiator = utils.RedisSource
 		if len(utils.TotalConnecntions) > MaxConnections {
 			data := redisparser.EncodeBulkBytes([]byte("Max connections from the TCP server exceeded"))
 			client.Conn.Write(data)
