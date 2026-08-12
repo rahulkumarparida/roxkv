@@ -2,13 +2,14 @@ package server
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"sync"
 
-	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	master "github.com/rahulkumarparida/roxkv/agents/Master"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -55,41 +56,46 @@ func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, provid
 
 }
 
-func ChatServer(stre *store.MemoryAlloc, provider abstractor.Provider) {
-
-	listner, err := net.Listen("tcp", ":6970")
+func ChatServer(stre *store.MemoryAlloc, provider abstractor.Provider) error {
+	listner, err := net.Listen("tcp", ChatTCPAddr)
 
 	if err != nil {
-		fmt.Println("Server is busy and not listening at port 6970:", err)
-		logger.ErrorLog("error while connecting to the TCP server, port 6969 is busy")
-		return
+		return fmt.Errorf("start RoxAI TCP server on %s: %w", ChatTCPAddr, err)
 	}
-	defer listner.Close()
-	fmt.Println("Listening RoxAI Connections at localhost:6970")
+	fmt.Println("Listening RoxAI Connections at localhost" + ChatTCPAddr)
+	startupLog("server ports", "AI TCP "+ChatTCPAddr)
 
-	for {
-		conn, err := listner.Accept()
+	go func() {
+		defer listner.Close()
 
-		if err != nil {
-			fmt.Println("Connection could not be established:", err)
-			logger.ErrorLog("Connection failed could not be established")
-			continue
+		for {
+			conn, err := listner.Accept()
+
+			if err != nil {
+				if errors.Is(err, net.ErrClosed) {
+					return
+				}
+				fmt.Println("Connection could not be established:", err)
+				logger.ErrorLog("Connection failed could not be established")
+				continue
+			}
+
+			client := *utils.CreateClient(conn, "system")
+
+			cmutex.Lock()
+			if len(utils.TotalConnecntions) > MaxConnections {
+				client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
+				client.Conn.Close()
+				cmutex.Unlock()
+				continue
+			}
+			utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
+			cmutex.Unlock()
+
+			fmt.Println("Connected: ", client.ID)
+			go handleChatConnection(&client, stre, provider)
 		}
+	}()
 
-		client := *utils.CreateClient(conn, "system")
-
-		cmutex.Lock()
-		if len(utils.TotalConnecntions) > MaxConnections {
-			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
-			client.Conn.Close()
-			continue
-		}
-		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
-		cmutex.Unlock()
-
-		fmt.Println("Connected: ", client.ID)
-		go handleChatConnection(&client, stre, provider)
-
-	}
-
+	return nil
 }

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
 var configMu sync.RWMutex
@@ -30,11 +32,11 @@ type ProviderConfig struct {
 
 // ConfigDirectory returns the absolute path to the roxconfig directory
 func ConfigDirectory() (string, error) {
-	homePath, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	dir := utils.ConfigFolder()
+	if strings.TrimSpace(dir) == "" {
+		return "", fmt.Errorf("failed to determine config directory")
 	}
-	return filepath.Join(homePath, ".roxkv", "roxconfig"), nil
+	return dir, nil
 }
 
 // EnsureConfigDirectory ensures that the .roxkv/roxconfig directory exists.
@@ -61,7 +63,7 @@ func GetConfigPath(provider string) (string, error) {
 	if provider == "" || strings.Contains(provider, "..") || strings.Contains(provider, "/") {
 		return "", fmt.Errorf("invalid provider name: %s", provider)
 	}
-	return filepath.Join(dir,fmt.Sprintf("%v",provider)), nil
+	return filepath.Join(dir, fmt.Sprintf("%v", provider)), nil
 }
 
 // SaveProvider saves the given ProviderConfig to the filesystem.

@@ -3,12 +3,14 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	master "github.com/rahulkumarparida/roxkv/agents/Master"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/internal/config"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -41,7 +43,7 @@ func handlePreflight(w http.ResponseWriter, r *http.Request) bool {
 	return false
 }
 
-func WebChatServer(stre *store.MemoryAlloc, provider abstractor.Provider) {
+func WebChatServer(stre *store.MemoryAlloc, provider abstractor.Provider) error {
 	StoreInstance = stre
 	AgentInstance = provider
 
@@ -69,13 +71,21 @@ func WebChatServer(stre *store.MemoryAlloc, provider abstractor.Provider) {
 	router.HandleFunc("/providers/{provider}/stats", getProviderStatsHandler).Methods("GET", "OPTIONS")
 	router.HandleFunc("/api/providers/{provider}/stats", getProviderStatsHandler).Methods("GET", "OPTIONS")
 
-	fmt.Println("Listening WebChat API at localhost:6972")
-
-	err := http.ListenAndServe(":6972", router)
+	listener, err := net.Listen("tcp", ChatHTTPAddr)
 	if err != nil {
-		fmt.Printf("Error in starting the server %v", err)
-		return
+		return fmt.Errorf("start AI chat HTTP server on %s: %w", ChatHTTPAddr, err)
 	}
+	fmt.Println("Listening WebChat API at localhost" + ChatHTTPAddr)
+	startupLog("server ports", "AI HTTP "+ChatHTTPAddr)
+
+	httpServer := &http.Server{Handler: router}
+	go func() {
+		if serveErr := httpServer.Serve(listener); serveErr != nil && serveErr != http.ErrServerClosed {
+			log.Printf("AI chat HTTP server stopped: %v", serveErr)
+		}
+	}()
+
+	return nil
 }
 
 var payload struct {

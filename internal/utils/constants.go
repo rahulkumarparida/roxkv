@@ -17,13 +17,13 @@ var TotalConnecntions []*NewClient
 
 type Role string
 type Mode struct {
-	Name string
-	Topic []string
+	Name   string
+	Topic  []string
 	PTopic []string
 }
 
 type InitSource struct {
-	Source string
+	Source   string
 	JoinedAt time.Time
 }
 
@@ -34,39 +34,40 @@ const (
 )
 
 var ModeDefault = Mode{
-	Name: "default",
-	Topic: nil,
+	Name:   "default",
+	Topic:  nil,
 	PTopic: nil,
 }
 
 var ModeSubsriber = Mode{
-	Name: "subscriber",
-	Topic: []string{},
+	Name:   "subscriber",
+	Topic:  []string{},
 	PTopic: []string{},
 }
 
 var DefaultSource = InitSource{
-	Source: "local",
+	Source:   "local",
 	JoinedAt: time.Now(),
 }
 
 var RedisSource = InitSource{
-	Source: "redis",
+	Source:   "redis",
 	JoinedAt: time.Now(),
 }
+
 type NewClient struct {
 	ID           any          `json:"id"`
-	Name         string		  `json:"name"`
-	Library_Name string		  `json:"library_name"` // I a redis libraby connect we need to save the linraryname and version
-	Library_Ver  string		  `json:"library_ver"`
-	Buffer 		[]byte		  `json:"buffer"` // For client's data to be recie3
+	Name         string       `json:"name"`
+	Library_Name string       `json:"library_name"` // I a redis libraby connect we need to save the linraryname and version
+	Library_Ver  string       `json:"library_ver"`
+	Buffer       []byte       `json:"buffer"` // For client's data to be recie3
 	Role         string       `json:"role"`
 	Conn         net.Conn     `json:"-"`
 	LastUsed     time.Time    `json:"lastUsed"`
 	ConnectedAt  time.Time    `json:"connectedAt"`
 	Mu           sync.RWMutex `json:"-"`
 	Interactions int          `json:"interactions"`
-	Mode 		 Mode		  `json:"mode"`
+	Mode         Mode         `json:"mode"`
 	Initiator    InitSource   `json:"initiator"`
 }
 
@@ -91,68 +92,55 @@ func CreateClient(conn net.Conn, role string) *NewClient {
 		ConnectedAt:  time.Now(),
 		Mu:           sync.RWMutex{},
 		Interactions: 1,
-		Mode: ModeDefault,
-		Initiator: DefaultSource,
+		Mode:         ModeDefault,
+		Initiator:    DefaultSource,
 	}
 }
 
 // Metrics
 type MonitorComputeStat struct {
-	Username        string  `json:"username"`
-	Os              string  `json:"os"`
-	Architecture    string  `json:"architecture"`
-	Cpus            int     `json:"cpus"`
-	TotalRam        uint64  `json:"totalRam"`
-	FreeRam         uint64  `json:"freeRam"`
-	UsedRamPercent  float64 `json:"usedRamPercent"`
-	TotalGoRoutines int     `json:"totalGoRoutines"`
-	ServerUptime	time.Duration `json:"serverUptime"`
+	Username        string        `json:"username"`
+	Os              string        `json:"os"`
+	Architecture    string        `json:"architecture"`
+	Cpus            int           `json:"cpus"`
+	TotalRam        uint64        `json:"totalRam"`
+	FreeRam         uint64        `json:"freeRam"`
+	UsedRamPercent  float64       `json:"usedRamPercent"`
+	TotalGoRoutines int           `json:"totalGoRoutines"`
+	ServerUptime    time.Duration `json:"serverUptime"`
+}
+
+func roxKVRoot() string {
+	if customRoot := os.Getenv("ROXKV_HOME"); customRoot != "" {
+		return customRoot
+	}
+
+	homePath, err := os.UserHomeDir()
+	if HandleError("Error while fetching Home directory ", err) {
+		return ""
+	}
+
+	return filepath.Join(homePath, ".roxkv")
 }
 
 // Constant Folders section
 func DbFolder() string {
-	HomePath, err := os.UserHomeDir()
-	dbFolder := filepath.Join(HomePath, ".roxkv", "roxdb")
-	if HandleError("Error while fetching Home directory ", err) {
-		return ""
-	}
-	return dbFolder
+	return filepath.Join(roxKVRoot(), "roxdb")
 
 }
 
 func LogFolder() string {
-	HomePath, err := os.UserHomeDir()
-	logFolder := filepath.Join(HomePath, ".roxkv", "roxlogs")
-	if HandleError("Error while fetching Home directory ", err) {
-		return ""
-	}
-	return logFolder
+	return filepath.Join(roxKVRoot(), "roxlogs")
 }
 
 func SnapshotFolder() string {
-	HomePath, err := os.UserHomeDir()
-	snapFolder := filepath.Join(HomePath, ".roxkv", "roxsnaps")
-	if HandleError("Error while fetching Home directory ", err) {
-		return ""
-	}
-	return snapFolder
+	return filepath.Join(roxKVRoot(), "roxsnaps")
 }
 
 func MetricFolder() string {
-	HomePath, err := os.UserHomeDir()
-	metricFolder := filepath.Join(HomePath, ".roxkv", "roxmetrics")
-	if HandleError("Error while fetching Home directory ", err) {
-		return ""
-	}
-	return metricFolder
+	return filepath.Join(roxKVRoot(), "roxmetrics")
 }
 
-
-func ConfigFolder() string{
-	HomePath, err := os.UserHomeDir()
-	metricFolder := filepath.Join(HomePath, ".roxkv", "roxconfig")
-	if HandleError("Error while fetching Home directory ", err) {
-		return ""
-	}
-	return metricFolder
+func ConfigFolder() string {
+	return filepath.Join(roxKVRoot(), "roxconfig")
 }

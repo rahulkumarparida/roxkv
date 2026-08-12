@@ -3,10 +3,12 @@ package server
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/internal/commands"
+	"github.com/rahulkumarparida/roxkv/internal/config"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
@@ -21,6 +24,20 @@ import (
 )
 
 const MaxConnections = 10
+
+const (
+	NativeTCPAddr     = ":6969"
+	ChatTCPAddr       = ":6970"
+	EventsHTTPAddr    = ":6971"
+	ChatHTTPAddr      = ":6972"
+	RespTCPAddr       = ":6973"
+	DashboardHTTPAddr = ":8080"
+)
+
+type StartOptions struct {
+	Command        string
+	ExecutablePath string
+}
 
 var mutex = sync.RWMutex{}
 
@@ -91,41 +108,94 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 
 }
 
-func Server() {
-	config, err := abstractor.LoadConfig()
-	if err != nil {
-		log.Fatal("Failed to load AI configuration: ", err)
+func Run(options StartOptions) error {
+	startedAt := time.Now()
+	commandName := strings.TrimSpace(options.Command)
+	if commandName == "" {
+		commandName = "roxkv tcp"
 	}
-	provider, err := abstractor.NewProvider(*config)
-	if err != nil {
-		log.Fatal("Failed to initialize AI provider: ", err)
+
+	executablePath := strings.TrimSpace(options.ExecutablePath)
+	if executablePath == "" {
+		if currentExecutable, err := os.Executable(); err == nil {
+			executablePath = currentExecutable
+		}
 	}
+
+	startupLog("command detected", commandName)
+	if executablePath != "" {
+		startupLog("executable location", executablePath)
+	}
+
+	if err := config.EnsureConfigDirectory(); err != nil {
+		return fmt.Errorf("initialize configuration directory: %w", err)
+	}
+	startupLog("configuration loaded", fmt.Sprintf("provider config directory ready at %s", utils.ConfigFolder()))
+
+	providerConfig, err := abstractor.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("load AI configuration from %s: %w", abstractor.ConfigPath(), err)
+	}
+	startupLog("configuration loaded", fmt.Sprintf("AI provider=%s model=%s path=%s", providerConfig.Provider, providerConfig.Model, abstractor.ConfigPath()))
+
+	provider, err := abstractor.NewProvider(*providerConfig)
+	if err != nil {
+		return fmt.Errorf("initialize AI provider %s/%s: %w", providerConfig.Provider, providerConfig.Model, err)
+	}
+	startupLog("agents initialized", fmt.Sprintf("provider %s model %s", providerConfig.Provider, providerConfig.Model))
 
 	stre, _ := store.StoreInMemory()
+	store.StoreHelper = stre
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	listner, err := net.Listen("tcp", ":6969")
 
+	startupLog("storage initialized", fmt.Sprintf("db=%s snapshots=%s logs=%s", utils.DbFolder(), utils.SnapshotFolder(), utils.LogFolder()))
+
+	listner, err := net.Listen("tcp", NativeTCPAddr)
 	if err != nil {
-		fmt.Println("Server is busy and not listening at port 6969:", err)
-		logger.ErrorLog("error while connecting to the TCP server, port 6969 is busy")
-		return
+		return fmt.Errorf("start TCP server on %s: %w", NativeTCPAddr, err)
 	}
 	defer listner.Close()
+
 	utils.ServerStarted = time.Now()
-	store.StoreHelper = stre
 	go worker.SnapshotWorker(ctx, stre, &mutex, utils.TotalConnecntions)
-	fmt.Println("Listening CLI Connection at localhost:6969")
-	go ChatServer(stre, provider)
-	go WebServer()
-	go WebChatServer(stre, provider)
-	go RespServer(stre, provider)
+	startupLog("server ports", "native TCP "+NativeTCPAddr)
+
+	if err := ChatServer(stre, provider); err != nil {
+		return err
+	}
+	if err := WebServer(); err != nil {
+		return err
+	}
+	if err := WebChatServer(stre, provider); err != nil {
+		return err
+	}
+	if err := RespServer(stre, provider); err != nil {
+		return err
+	}
+	if err := DashboardServer(); err != nil {
+		return err
+	}
+
+	startupLog("initialization time", time.Since(startedAt).String())
+	return serveCLIConnections(listner, stre)
+}
+
+func Server() {
+	if err := Run(StartOptions{}); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func serveCLIConnections(listener net.Listener, stre *store.MemoryAlloc) error {
+	fmt.Println("Listening CLI Connection at localhost" + NativeTCPAddr)
 
 	for {
-
-		conn, err := listner.Accept()
-
+		conn, err := listener.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
 			fmt.Println("Connection could not be established:", err)
 			logger.ErrorLog("Connection failed could not be established")
 			continue
@@ -137,15 +207,14 @@ func Server() {
 		if len(utils.TotalConnecntions) > MaxConnections {
 			client.Conn.Write([]byte("\nMax connections from the TCP server exceeded\n"))
 			client.Conn.Close()
+			mutex.Unlock()
 			continue
 		}
 		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 		mutex.Unlock()
 		fmt.Println("Connected: ", client.ID)
 		go handleConnection(&client, stre)
-
 	}
-
 }
 
 // Background worker to remove inactive clients
@@ -174,4 +243,10 @@ func DeadOrAliveConnections(ctx context.Context, client *utils.NewClient) {
 
 		}
 	}
+}
+
+func startupLog(step string, message string) {
+	formatted := fmt.Sprintf("%s: %s", step, message)
+	log.Printf("[startup] %s", formatted)
+	logger.InfoLog("[startup] " + formatted)
 }

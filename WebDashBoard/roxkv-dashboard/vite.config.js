@@ -12,6 +12,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    build: {
+      outDir: '../../server/dashboard/dist',
+      emptyOutDir: true,
+    },
     server: {
       host: '0.0.0.0',
       port,

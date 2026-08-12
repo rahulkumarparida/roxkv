@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"slices"
@@ -18,32 +19,38 @@ import (
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-
 // Accepting the HTTP request as HTTP
-func WebServer() {
-
-
-	fmt.Println("Listening Webserver at localhost:6971")
-	
+func WebServer() error {
 	if err := config.EnsureConfigDirectory(); err != nil {
-		log.Printf("Warning: failed to ensure config directory: %v", err)
+		return fmt.Errorf("ensure config directory for web server: %w", err)
 	}
 
 	router := mux.NewRouter()
 	router.HandleFunc("/healthz", HealthHandler).Methods("GET")
 	router.HandleFunc("/api/events/{name}", SseHandler).Methods("GET")
-	
+
 	// Configuration Endpoints
 	router.HandleFunc("/api/config/providers", config.ListProvidersHandler).Methods("GET", "OPTIONS")
 	router.HandleFunc("/api/config/provider/{provider}", config.SaveProviderHandler).Methods("POST", "OPTIONS")
 	router.HandleFunc("/api/config/provider/{provider}", config.LoadProviderHandler).Methods("GET", "OPTIONS")
 	router.HandleFunc("/api/config/provider/{provider}", config.DeleteProviderHandler).Methods("DELETE", "OPTIONS")
-	
-	err := http.ListenAndServe(":6971", router)
 
+	listener, err := net.Listen("tcp", EventsHTTPAddr)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("start HTTP/SSE server on %s: %w", EventsHTTPAddr, err)
 	}
+	fmt.Println("Listening Webserver at localhost" + EventsHTTPAddr)
+	startupLog("server ports", "HTTP/SSE "+EventsHTTPAddr)
+
+	httpServer := &http.Server{Handler: router}
+	go func() {
+		if serveErr := httpServer.Serve(listener); serveErr != nil && serveErr != http.ErrServerClosed {
+			log.Printf("HTTP/SSE server stopped: %v", serveErr)
+			logger.ErrorLog("HTTP/SSE server stopped: " + serveErr.Error())
+		}
+	}()
+
+	return nil
 
 }
 
@@ -134,27 +141,25 @@ func GetComputerInformation() metrics.RuntimeStats {
 	return data
 }
 
-
-
 type DataBaseInfo struct {
-	SavedDataSize     int64            `json:"savedDataSize"`
-	SavedSnapShotSize int64            `json:"savedSnapShotSize"`
-	TotalKeysSize     int64            `json:"totalKeysSize"`
-	LastSnapShotTime  time.Time        `json:"lastSnapShotTime"`
+	SavedDataSize     int64             `json:"savedDataSize"`
+	SavedSnapShotSize int64             `json:"savedSnapShotSize"`
+	TotalKeysSize     int64             `json:"totalKeysSize"`
+	LastSnapShotTime  time.Time         `json:"lastSnapShotTime"`
 	TtlMetrics        *store.TTLMetrics `json:"ttlMetrics"`
-	PubSubTopics      []TopicList         `json:"pubsubTopics"`
+	PubSubTopics      []TopicList       `json:"pubsubTopics"`
 }
 
-type MonitorStats struct{
-	CpuUsage string `json:"cpuusage"`
-	RamUsage metrics.RAM `json:"ramusage"`
-	DiskUsage metrics.DISK `json:"diskusage"`
-	NetworkUsage metrics.NetworkStat `json:"networkstats"`
-	MachineInfo metrics.RuntimeStats `json:"machineinfo"`
+type MonitorStats struct {
+	CpuUsage     string               `json:"cpuusage"`
+	RamUsage     metrics.RAM          `json:"ramusage"`
+	DiskUsage    metrics.DISK         `json:"diskusage"`
+	NetworkUsage metrics.NetworkStat  `json:"networkstats"`
+	MachineInfo  metrics.RuntimeStats `json:"machineinfo"`
 }
 
-// Monitor 
-func MonitorStatsData() MonitorStats{
+// Monitor
+func MonitorStatsData() MonitorStats {
 	netStats := make(chan metrics.NetworkStat, 0)
 	machineinfo := GetComputerInformation()
 	cpudata := metrics.GetCPUUsage()
@@ -165,11 +170,11 @@ func MonitorStatsData() MonitorStats{
 	networkData := <-netStats
 
 	return MonitorStats{
-		CpuUsage: cpudata,
-		RamUsage: ramdata,
-		DiskUsage: diskdata,
+		CpuUsage:     cpudata,
+		RamUsage:     ramdata,
+		DiskUsage:    diskdata,
 		NetworkUsage: networkData,
-		MachineInfo:machineinfo,
+		MachineInfo:  machineinfo,
 	}
 
 }
@@ -226,22 +231,21 @@ func GetTopicList(client *utils.NewClient) TopicList {
 
 }
 
-
 type SnapshotInfo struct {
 	TotalSnapShotSize int64     `json:"totalSnapShotSize"`
-	TotalSnapshots int       `json:"totalSnapshots"`
-	LatestSnapshot time.Time `json:"latestSnapshot"`
-	LastCreated    time.Time `json:"lastCreated"`
-	NextSnap       float64 `json:"nextSnap"`
+	TotalSnapshots    int       `json:"totalSnapshots"`
+	LatestSnapshot    time.Time `json:"latestSnapshot"`
+	LastCreated       time.Time `json:"lastCreated"`
+	NextSnap          float64   `json:"nextSnap"`
 }
 
-//Snapshot Info
-func SnapshotData() SnapshotInfo{
+// Snapshot Info
+func SnapshotData() SnapshotInfo {
 
 	snapshotFolder := utils.SnapshotFolder()
 
 	snapinfo, err := os.Stat(snapshotFolder)
-		if err != nil {
+	if err != nil {
 		fmt.Println("Directories not found")
 		return SnapshotInfo{}
 	}
@@ -253,22 +257,21 @@ func SnapshotData() SnapshotInfo{
 
 	return SnapshotInfo{
 		TotalSnapShotSize: snapshotSize,
-		TotalSnapshots: totalSnaps,
-		LatestSnapshot: latestsnap.ModifiedAt,
-		LastCreated: lastCreated,
-		NextSnap: NextSnap,
+		TotalSnapshots:    totalSnaps,
+		LatestSnapshot:    latestsnap.ModifiedAt,
+		LastCreated:       lastCreated,
+		NextSnap:          NextSnap,
 	}
 }
 
-
 // History Info
-func LiveHistoryData() []string{
-	data , err := logger.ReadFromFile("--all")
-	if err != nil{
-		return  []string{"Not Data Found","Chcek after a few seconds"}
+func LiveHistoryData() []string {
+	data, err := logger.ReadFromFile("--all")
+	if err != nil {
+		return []string{"Not Data Found", "Chcek after a few seconds"}
 	}
 
-	dataArr := strings.Split(data,"\n")
+	dataArr := strings.Split(data, "\n")
 	slices.Reverse(dataArr)
-	return dataArr[1:len(dataArr)-1] // Exclude the first and last empty lines	
+	return dataArr[1 : len(dataArr)-1] // Exclude the first and last empty lines
 }
