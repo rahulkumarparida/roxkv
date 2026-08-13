@@ -32,8 +32,7 @@ func RespServer(stre *store.MemoryAlloc, provider abstractor.Provider) error {
 				if errors.Is(err, net.ErrClosed) {
 					return
 				}
-				fmt.Println("Connection could not be established:", err)
-				logger.ErrorLog("Connection failed could not be established")
+				logger.ErrorLog("RESP TCP connection accept error: " + err.Error())
 				continue
 			}
 
@@ -50,7 +49,7 @@ func RespServer(stre *store.MemoryAlloc, provider abstractor.Provider) error {
 			}
 			utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 			mutex.Unlock()
-			fmt.Println("Connected: ", client.ID)
+			logger.InfoLog("New RESP client connected: " + fmt.Sprintf("%v", client.ID))
 			go HandleRespConnections(&client, stre, provider)
 		}
 	}()

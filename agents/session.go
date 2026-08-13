@@ -51,11 +51,10 @@ func (s *AgentSession) Run(ctx context.Context, provider abstractor.Provider, mo
 	copy(msgSnapshot, s.messages)
 	s.mu.Unlock()
 
-	// Execute via LLM Manager failover engine
-	fmt.Println("Model:", model, provider)
+	logger.InfoLog("Executing via LLM failover: provider=" + fmt.Sprintf("%v", provider) + " model=" + model)
 	resp, activeProv, err := abstractor.ExecuteWithFailover(ctx, provider, model, options, msgSnapshot, tools)
 	if err != nil {
-		fmt.Println("LLM Manager Failover Error:", err)
+		logger.ErrorLog("LLM Manager Failover Error: " + err.Error())
 		return nil, "", err
 	}
 

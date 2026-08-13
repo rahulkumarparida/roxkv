@@ -21,8 +21,7 @@ func CheckInputLength(input []string, paramsrequired int) bool {
 func ParseCommands(store *store.MemoryAlloc, input []string, client *utils.NewClient) any {
 
 	if len(input) == 0 {
-		fmt.Println("Check Man page")
-
+		logger.InfoLog("ParseCommands: empty input received")
 	}
 	data := input[1:]
 
@@ -42,37 +41,26 @@ func ParseCommands(store *store.MemoryAlloc, input []string, client *utils.NewCl
 		} 
 
 		val := SetCommand(client, store, [][]byte(bytesdata))
-		if val {
-			fmt.Println("Added the KeyValue")
-			return val
-		} else {
-			fmt.Println("Some Error occured")
-			return val
-		}
+		logger.InfoLog("SET command executed: success=" + fmt.Sprintf("%v", val))
+		return val
 	case "DEL", "del", "Del":
 		val := DelCommand(store, data)
-		if val {
-			fmt.Println("Removed the value")
-			return val
-		} else {
-			fmt.Println("No Such value found")
-			return val
-		}
+		logger.InfoLog("DEL command executed: success=" + fmt.Sprintf("%v", val))
+		return val
 	case "KEYS", "keys", "Keys":
 		dataItems := KeysCommand(store)
-		fmt.Println("The List of keys avaliable: ", dataItems)
+		logger.InfoLog("KEYS command executed")
 		return dataItems
 	case "SAVE", "Save", "save":
 		datamsg := SaveCommand(store)
-		fmt.Println(datamsg)
+		logger.InfoLog("SAVE command executed: " + fmt.Sprintf("%v", datamsg))
 		return datamsg
 	case "LOAD", "Load", "load":
 		count := LoaderCommand(store)
-		fmt.Println("Restored: ", count, " Keys")
+		logger.InfoLog("LOAD command executed: restored " + fmt.Sprintf("%d", count) + " keys")
 		return count
 	case "HISTORY", "History", "history":
 		history := HistoryCommand(data)
-		fmt.Println(history)
 		return history
 	case "SUBSCRIBE", "Subscribe", "subscribe":
 		valid := CheckInputLength(data, 1)
@@ -103,8 +91,6 @@ func ParseCommands(store *store.MemoryAlloc, input []string, client *utils.NewCl
 		RemoveTopicCommand(client, data)
 	default:
 		logger.ErrorLog(input[0] + " command not found")
-		// fmt.Println("Command Not Found,Check the man page")
-		fmt.Println("Recieved: ", input)
 		return "+RUN\r\n"
 	}
 
@@ -175,9 +161,7 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data [][]byte)
 
 	if len(data[1:]) <= 0 {
 		logger.ErrorLog("Provided empty value in the key value pair")
-		fmt.Println("Empty value provided")
 		return false
-
 	}
 
 	if string(data[0]) == "--ttl" {
@@ -186,7 +170,6 @@ func SetCommand(client *utils.NewClient, stre *store.MemoryAlloc, data [][]byte)
 		
 		if len(ttlVals) > 2 || string(ttlVals[0]) == "" || string(ttlVals[1]) == "" {
 			logger.ErrorLog("2 Args after the --ttl flag")
-			fmt.Println("2 args after --ttl")
 			return false
 		}
 		value := bytes.Join(dataVals[1:],[]byte(" "))
@@ -283,7 +266,7 @@ func SetCommandBytes(client *utils.NewClient, stre *store.MemoryAlloc, key strin
 
 func GetCommand(stre *store.MemoryAlloc, data []string) any {
 	if len(data) != 1 {
-		fmt.Println("Check Man page")
+		logger.InfoLog("GetCommand: expected 1 arg, got " + fmt.Sprintf("%d", len(data)))
 	}
 	// fmt.Println("Store:", stre)
 
@@ -297,7 +280,7 @@ func GetCommand(stre *store.MemoryAlloc, data []string) any {
 
 func DelCommand(stre *store.MemoryAlloc, data []string) bool {
 	if len(data) != 1 {
-		fmt.Println("Check Man page")
+		logger.InfoLog("DelCommand: expected 1 arg, got " + fmt.Sprintf("%d", len(data)))
 	}
 
 	dataVal := store.DelKv(stre, data[0])
@@ -315,7 +298,7 @@ func KeysCommand(stre *store.MemoryAlloc) []string {
 func SaveCommand(stre *store.MemoryAlloc) string {
 
 	keys := store.KeyKv(stre)
-	fmt.Println("Keys:", keys)
+	logger.InfoLog("SaveCommand: saving " + fmt.Sprintf("%d", len(keys)) + " keys")
 	var allData []store.Item
 	for _, key := range keys {
 
@@ -328,9 +311,10 @@ func SaveCommand(stre *store.MemoryAlloc) string {
 	dbpath := utils.DbFolder()
 	filename := time.Now().Format("2006-01-02") + ".json"
 	val := persistence.StoreToJson(dbpath, filename, allData)
-	fmt.Println("Saving: ", val)
-	logmsg := "All keys avaliable in RAM till now are saved to DB"
-	logger.SucessLog(logmsg)
+	logger.SucessLog("All keys available in RAM till now are saved to DB")
+	if !val {
+		logger.ErrorLog("SaveCommand: persistence failed")
+	}
 	return "Saved"
 }
 

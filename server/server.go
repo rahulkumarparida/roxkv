@@ -69,7 +69,7 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 	for {
 
 		input, err := reader.ReadString('\n')
-		print(input)
+		logger.InfoLog("Received input from client " + fmt.Sprintf("%v", client.ID))
 
 		mutex.Lock()
 		utils.TotalInputs += 1
@@ -82,11 +82,9 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("Client Disconnected:", err)
-				fmt.Println("Client name: ", client.ID)
+				logger.InfoLog("Client disconnected: " + fmt.Sprintf("%v", client.ID))
 			} else {
-				fmt.Println("err:", err)
-				logger.ErrorLog("Error while reading data")
+				logger.ErrorLog("Connection read error for client " + fmt.Sprintf("%v", client.ID) + ": " + err.Error())
 			}
 			DeleteClientListing(client)
 			break
@@ -100,8 +98,7 @@ func handleConnection(client *utils.NewClient, store *store.MemoryAlloc) {
 		// _, werr := client.Conn.Write([]byte("+" + string(input) + "\r\n"))
 
 		if werr != nil {
-			fmt.Println("err:", werr)
-
+			logger.ErrorLog("Connection write error for client " + fmt.Sprintf("%v", client.ID) + ": " + werr.Error())
 		}
 
 	}
@@ -196,8 +193,7 @@ func serveCLIConnections(listener net.Listener, stre *store.MemoryAlloc) error {
 			if errors.Is(err, net.ErrClosed) {
 				return nil
 			}
-			fmt.Println("Connection could not be established:", err)
-			logger.ErrorLog("Connection failed could not be established")
+			logger.ErrorLog("CLI connection accept error: " + err.Error())
 			continue
 		}
 
@@ -212,7 +208,7 @@ func serveCLIConnections(listener net.Listener, stre *store.MemoryAlloc) error {
 		}
 		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 		mutex.Unlock()
-		fmt.Println("Connected: ", client.ID)
+		logger.InfoLog("New CLI client connected: " + fmt.Sprintf("%v", client.ID))
 		go handleConnection(&client, stre)
 	}
 }
@@ -221,12 +217,11 @@ func serveCLIConnections(listener net.Listener, stre *store.MemoryAlloc) error {
 
 func ClearConnections(t time.Time, client *utils.NewClient) {
 	if time.Since(client.LastUsed) > (10 * time.Minute) {
-		fmt.Println("Client died: ", client.ID)
+		logger.InfoLog("Inactive client removed: " + fmt.Sprintf("%v", client.ID))
 		client.Conn.Write([]byte("Client was Inactive for too long \n"))
 		client.Conn.Close()
 		DeleteClientListing(client)
 		logger.InfoLog("Ticker worked at : " + t.Format("2006-01-02 15:04:05"))
-
 	}
 }
 

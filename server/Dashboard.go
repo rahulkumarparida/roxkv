@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"path"
 	"strings"
+
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 )
 
 //go:embed dashboard/dist/*
@@ -27,12 +29,12 @@ func DashboardServer() error {
 
 	startupLog("frontend status", fmt.Sprintf("embedded dashboard assets ready (%d files)", assetCount))
 	startupLog("dashboard status", "serving dashboard on "+DashboardHTTPAddr)
-	fmt.Println("Listening to Web Dashboard at " + DashboardHTTPAddr)
 
 	httpServer := &http.Server{Handler: dashboardHandler(staticFiles)}
 	go func() {
 		if serveErr := httpServer.Serve(listener); serveErr != nil && serveErr != http.ErrServerClosed {
 			log.Printf("dashboard server stopped: %v", serveErr)
+			logger.ErrorLog("Dashboard server stopped: " + serveErr.Error())
 		}
 	}()
 

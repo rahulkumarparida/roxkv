@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rahulkumarparida/roxkv/internal/config"
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 )
 
 type FailoverResult struct {
@@ -214,7 +215,7 @@ func ExecuteWithFailover(ctx context.Context, initialProvider Provider, model st
 	sequence := GetFailoverSequence(initialActive)
 	if len(sequence) == 0 {
 		msg := "All configured LLM providers are currently unavailable. Please wait until the services are available and try again later."
-		fmt.Printf("[LLM Manager]\nError: %s\n", msg)
+		logger.ErrorLog("[LLM Manager] " + msg)
 		return nil, "", &FailoverError{
 			Message:            msg,
 			ProvidersAttempted: []string{},
@@ -225,7 +226,7 @@ func ExecuteWithFailover(ctx context.Context, initialProvider Provider, model st
 
 	for _, providerName := range sequence {
 		attemptedProviders = append(attemptedProviders, providerName)
-		fmt.Printf("\n[LLM Manager]\nCurrent Provider: %s\nSending request...\n", providerName)
+		logger.InfoLog("[LLM Manager] Attempting provider: " + providerName)
 
 		var pConfig ProviderConfig
 		activeCfg := GetConfig()
@@ -269,7 +270,7 @@ func ExecuteWithFailover(ctx context.Context, initialProvider Provider, model st
 		} else {
 			providerImpl, err = NewProvider(pConfig)
 			if err != nil {
-				fmt.Printf("[LLM Manager]\nFailed to instantiate provider %s: %v\nNon-retryable error. Switching immediately to next provider...\n", providerName, err)
+				logger.ErrorLog("[LLM Manager] Failed to instantiate provider " + providerName + ": " + err.Error())
 				continue
 			}
 		}
@@ -284,38 +285,38 @@ func ExecuteWithFailover(ctx context.Context, initialProvider Provider, model st
 			}
 
 			if attempt > 1 {
-				fmt.Printf("\nAttempt %d...\n", attempt)
+				logger.InfoLog("[LLM Manager] Attempt " + fmt.Sprintf("%d", attempt) + " for provider " + providerName)
 			}
 
 			resp, lastErr = providerImpl.Chat(ctx, messages, tools, pConfig)
 			if lastErr == nil && resp != nil {
-				fmt.Println("\nSuccess.")
+				logger.SucessLog("[LLM Manager] Provider " + providerName + " responded successfully")
 				IncrementQueryCount(providerName)
 				return resp, providerName, nil
 			}
 
-			fmt.Printf("\n%v\n", lastErr)
+			logger.ErrorLog("[LLM Manager] Error from provider " + providerName + ": " + fmt.Sprintf("%v", lastErr))
 
 			if !IsRetryableError(lastErr) {
-				fmt.Println("[LLM Manager]\nNon-retryable error.\nSwitching immediately to next provider...")
+				logger.InfoLog("[LLM Manager] Non-retryable error for " + providerName + ". Switching to next provider.")
 				break
 			}
 
 			if attempt == 1 {
-				fmt.Println("\nRetrying in 1s...")
+				logger.InfoLog("[LLM Manager] Retrying provider " + providerName + " in 1s")
 				time.Sleep(1 * time.Second)
 			} else if attempt == 2 {
-				fmt.Println("\nRetrying in 2s...")
+				logger.InfoLog("[LLM Manager] Retrying provider " + providerName + " in 2s")
 				time.Sleep(2 * time.Second)
 			} else if attempt == 3 {
-				fmt.Println("\nProvider unavailable.")
+				logger.ErrorLog("[LLM Manager] Provider " + providerName + " unavailable after 3 attempts")
 				break
 			}
 		}
 	}
 
 	allFailedMsg := "All configured LLM providers are currently unavailable. Please wait until the services are available and try again later."
-	fmt.Printf("[LLM Manager]\nError: %s (Attempted: %v)\n", allFailedMsg, attemptedProviders)
+	logger.ErrorLog("[LLM Manager] All providers failed. Attempted: " + fmt.Sprintf("%v", attemptedProviders))
 
 	return nil, "", &FailoverError{
 		Message:            allFailedMsg,

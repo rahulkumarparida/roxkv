@@ -29,7 +29,6 @@ func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, provid
 	for {
 
 		input, err := reader.ReadString('\n')
-		print(input)
 
 		cmutex.Lock()
 		user.Interactions += 1
@@ -38,11 +37,9 @@ func handleChatConnection(user *utils.NewClient, stre *store.MemoryAlloc, provid
 
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("Client Disconnected:", err)
-				fmt.Println("Client name: ", user.ID)
+				logger.InfoLog("AI client disconnected: " + fmt.Sprintf("%v", user.ID))
 			} else {
-				fmt.Println("err:", err)
-				logger.ErrorLog("Error while reading data")
+				logger.ErrorLog("AI connection read error for client " + fmt.Sprintf("%v", user.ID) + ": " + err.Error())
 			}
 			break
 		}
@@ -75,8 +72,7 @@ func ChatServer(stre *store.MemoryAlloc, provider abstractor.Provider) error {
 				if errors.Is(err, net.ErrClosed) {
 					return
 				}
-				fmt.Println("Connection could not be established:", err)
-				logger.ErrorLog("Connection failed could not be established")
+				logger.ErrorLog("AI TCP connection accept error: " + err.Error())
 				continue
 			}
 
@@ -92,7 +88,7 @@ func ChatServer(stre *store.MemoryAlloc, provider abstractor.Provider) error {
 			utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
 			cmutex.Unlock()
 
-			fmt.Println("Connected: ", client.ID)
+			logger.InfoLog("New AI TCP client connected: " + fmt.Sprintf("%v", client.ID))
 			go handleChatConnection(&client, stre, provider)
 		}
 	}()

@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -159,7 +158,7 @@ func Broker(client *utils.NewClient, topic string, msg string) {
 		if sub == client {
 			continue
 		}else{
-			fmt.Println("Sending them msg:",msg)
+			logger.InfoLog("Pubsub: delivering message to subscriber " + sub.Conn.RemoteAddr().String())
 			if client.Initiator == utils.RedisSource {
 				continue
 			}
@@ -239,7 +238,7 @@ func CloseChannel(client *utils.NewClient, topic string) {
 func PublishToAllTopics(client *utils.NewClient, message string) string {
 
 	if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
-		fmt.Println("Client are not allowed to publish everywhere")
+		logger.ErrorLog("Pubsub: client " + client.Role + " is not allowed to publish everywhere")
 		return ""
 	}
 	logger.InfoLog(" " + client.Role + " : Broadcasted a message across all topics")

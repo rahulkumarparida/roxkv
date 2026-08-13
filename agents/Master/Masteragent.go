@@ -130,26 +130,25 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 		modelName = activeCfg.Model
 	}
 
-	fmt.Println("Sending it to the session runner with total ", len(tools), " tools-->")
+	logger.InfoLog("Routing to session runner with " + fmt.Sprintf("%d", len(tools)) + " tools")
 	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, provider, modelName, query, finalizedTools, MasterInference)
 
 	if cerr != nil {
-		fmt.Printf("[MasterAgent] Orchestrator LLM call error: %v\n", cerr)
+		logger.ErrorLog("[MasterAgent] Orchestrator LLM call error: " + cerr.Error())
 		return cerr.Error()
 	}
 
 	if len(toolsToExecute) > 0 {
-		fmt.Println("Toold to Execute:",toolsToExecute[0])
+		logger.InfoLog("Executing " + fmt.Sprintf("%d", len(toolsToExecute)) + " tool(s): " + toolsToExecute[0].Name)
 		var rawReplies []abstractor.GenericToolResult
 		var specialistReplies []string
 		for _, tool := range toolsToExecute {
-			fmt.Println("Executing: ", tool)
+			logger.InfoLog("Dispatching tool: " + tool.Name)
 
 			argsByte, _ := json.Marshal(tool.Arguments)
 
 			var args masterToolQueryArgs
 			_ = json.Unmarshal(argsByte, &args)
-			fmt.Println("Arguments Here :", args)
 
 
 			var response any
@@ -311,7 +310,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 				Name: tool.Name,
 				Content: []string{response.(string)},
 			}
-			fmt.Println("Data Appended: ", data)
+			logger.InfoLog("Tool result collected for: " + tool.Name)
 			rawReplies = append(rawReplies, data)
 			specialistReplies = append(specialistReplies, fmt.Sprintf("[%s]\n%s", tool.Name, response))
 		}
@@ -319,7 +318,7 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, p
 
 		_, finalText, cerr := session.Run(ctx, provider, modelName, "Synthesize the worker outputs into the final user-facing answer. Interpret raw execution data, highlight the result that matters, and keep the reply concise unless the user requested deeper analysis.", nil, MasterInference)
 		if cerr != nil {
-			fmt.Printf("[MasterAgent] Analysis LLM request error: %v\n", cerr)
+			logger.ErrorLog("[MasterAgent] Analysis LLM request error: " + cerr.Error())
 			if len(specialistReplies) > 0 {
 				return strings.Join(specialistReplies, "\n\n")
 			}

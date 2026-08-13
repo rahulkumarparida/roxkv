@@ -98,13 +98,13 @@ func SseHandler(w http.ResponseWriter, r *http.Request) {
 
 			stringifiedData, err := json.Marshal(data)
 			if err != nil {
-				fmt.Println("JSON Error:", err)
+				logger.ErrorLog("SseHandler: JSON marshal error: " + err.Error())
 				return
 			}
 
 			_, err = fmt.Fprintf(w, "data: %s\n\n", stringifiedData)
 			if err != nil {
-				fmt.Println("Write Error:", err)
+				logger.ErrorLog("SseHandler: write error: " + err.Error())
 				return
 			}
 
@@ -188,7 +188,7 @@ func DataBaseData(client *utils.NewClient) DataBaseInfo {
 	snapinfo, err := os.Stat(snapshotFolder)
 
 	if err != nil {
-		fmt.Println("Directories not found")
+		logger.ErrorLog("DataBaseData: directories not found")
 		return DataBaseInfo{}
 	}
 
@@ -246,7 +246,7 @@ func SnapshotData() SnapshotInfo {
 
 	snapinfo, err := os.Stat(snapshotFolder)
 	if err != nil {
-		fmt.Println("Directories not found")
+		logger.ErrorLog("SnapshotData: snapshot directory not found")
 		return SnapshotInfo{}
 	}
 	snapshotSize := snapinfo.Size()

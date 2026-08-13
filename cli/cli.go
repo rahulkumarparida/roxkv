@@ -2,12 +2,12 @@ package cli
 
 import (
 	"context"
-	"fmt"
 
 	"strings"
 
 	"github.com/chzyer/readline"
 	"github.com/rahulkumarparida/roxkv/internal/commands"
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/worker"
 )
@@ -24,14 +24,14 @@ func CLIUI() {
 
 		rl, err := readline.New("roxkv> ")
 		if err != nil {
-			fmt.Println("Error while initialising readline")
+			logger.ErrorLog("CLI: error initialising readline: " + err.Error())
 			break
 		}
 		defer rl.Close()
 
 		line, err := rl.Readline()
 		if err != nil {
-			fmt.Println("Error while reading data")
+			logger.ErrorLog("CLI: error reading line: " + err.Error())
 			continue
 		}
 

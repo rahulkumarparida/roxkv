@@ -12,6 +12,7 @@ import (
 	master "github.com/rahulkumarparida/roxkv/agents/Master"
 	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/internal/config"
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
@@ -126,7 +127,7 @@ func callAI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		fmt.Println("Error decoding JSON payload:", err)
+		logger.ErrorLog("callAI: error decoding JSON payload: " + err.Error())
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
@@ -140,7 +141,7 @@ func callAI(w http.ResponseWriter, r *http.Request) {
 
 	tcpConn, rw, err := hijacker.Hijack()
 	if err != nil || tcpConn == nil {
-		fmt.Println("Not able to hijack the connection:", err)
+		logger.ErrorLog("callAI: failed to hijack connection: " + fmt.Sprintf("%v", err))
 		return
 	}
 	defer tcpConn.Close()
