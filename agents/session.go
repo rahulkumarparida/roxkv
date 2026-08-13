@@ -3,15 +3,17 @@ package agents
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
-	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
 type AgentSession struct {
-	messages []api.Message `json:"messages"`
+	mu       sync.Mutex
+	messages []abstractor.GenericMessage `json:"messages"`
 }
 
 var sessionRegistry sync.Map
@@ -27,7 +29,7 @@ func GetSession(agentName, systemPrompt string, user *utils.NewClient) *AgentSes
 	}
 
 	session := &AgentSession{
-		messages: []api.Message{
+		messages: []abstractor.GenericMessage{
 			{
 				Role:    "system",
 				Content: systemPrompt,
@@ -39,64 +41,55 @@ func GetSession(agentName, systemPrompt string, user *utils.NewClient) *AgentSes
 	return actual.(*AgentSession)
 }
 
-func (s *AgentSession) Run(ctx context.Context, client *api.Client, model, query string, tools []api.Tool, options map[string]any) ([]api.ToolCall, string, error) {
-
-	s.messages = append(s.messages, api.Message{
+func (s *AgentSession) Run(ctx context.Context, provider abstractor.Provider, model, query string, tools []abstractor.GenericToolDefinition, options map[string]any) ([]abstractor.GenericToolCall, string, error) {
+	s.mu.Lock()
+	s.messages = append(s.messages, abstractor.GenericMessage{
 		Role:    "user",
 		Content: query,
 	})
+	msgSnapshot := make([]abstractor.GenericMessage, len(s.messages))
+	copy(msgSnapshot, s.messages)
+	s.mu.Unlock()
 
-	req := &api.ChatRequest{
-		Model:    model,
-		Messages: append([]api.Message(nil), s.messages...),
-		Tools:    tools,
-		Options:  options,
-	}
-
-	stream := false
-	req.Stream = &stream
-
-	var toolCalls []api.ToolCall
-	var assistantText string
-
-	err := client.Chat(ctx, req, func(resp api.ChatResponse) error {
-		if len(resp.Message.ToolCalls) > 0 {
-			toolCalls = resp.Message.ToolCalls
-		}
-		if resp.Message.Content != "" {
-			assistantText = resp.Message.Content
-		}
-		return nil
-	})
+	logger.InfoLog("Executing via LLM failover: provider=" + fmt.Sprintf("%v", provider) + " model=" + model)
+	resp, activeProv, err := abstractor.ExecuteWithFailover(ctx, provider, model, options, msgSnapshot, tools)
 	if err != nil {
+		logger.ErrorLog("LLM Manager Failover Error: " + err.Error())
 		return nil, "", err
 	}
 
-	if len(toolCalls) > 0 {
-		s.messages = append(s.messages, api.Message{
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(resp.ToolCalls) > 0 {
+		s.messages = append(s.messages, abstractor.GenericMessage{
 			Role:      "assistant",
-			ToolCalls: toolCalls,
+			ToolCalls: resp.ToolCalls,
 		})
-		return toolCalls, assistantText, nil
+		return resp.ToolCalls, resp.Text, nil
 	}
 
-	if assistantText != "" {
-		s.messages = append(s.messages, api.Message{
+	if resp.Text != "" {
+		s.messages = append(s.messages, abstractor.GenericMessage{
 			Role:    "assistant",
-			Content: assistantText,
+			Content: resp.Text,
 		})
 	}
-	logger.InfoLog("Assistant response: " + assistantText)
+	logger.InfoLog("Assistant response from " + activeProv + ": " + resp.Text)
 
-	return nil, assistantText, nil
+	return nil, resp.Text, nil
 }
 
-func (s *AgentSession) AppendToolResults(results ...string) {
-
-	for _, result := range results {
-		s.messages = append(s.messages, api.Message{
-			Role:    "tool",
-			Content: result,
+func (s *AgentSession) AppendToolResults(results ...abstractor.GenericToolResult) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, res := range results {
+		content := strings.Join(res.Content,",")
+		s.messages = append(s.messages, abstractor.GenericMessage{
+			Role:       "tool",
+			Content:    content,
+			ToolCallID: res.ID,
+			ToolName:   res.Name,
 		})
 	}
 }

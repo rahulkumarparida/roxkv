@@ -36,6 +36,7 @@ services:
       - "${BACKEND_EVENTS_PORT:-6971}:6971"      # HTTP / SSE API
       - "${BACKEND_CHAT_PORT:-6972}:6972"        # AI Chat HTTP
       - "${BACKEND_RESP_PORT:-6973}:6973"        # RESP TCP (redis-cli)
+      - "${BACKEND_DASHBOARD_PORT:-8080}:8080"   # Embedded dashboard
     volumes:
       - roxkv-data:/root/.roxkv
     depends_on:

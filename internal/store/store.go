@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -74,8 +73,7 @@ func (ma *MemoryAlloc) Get(key string) (Item, bool) {
 	data, exist := ma.Data[key]
 
 	if !exist {
-		fmt.Println("Key dows not exsist")
-		logger.InfoLog("Key does not exists")
+		logger.InfoLog("Key does not exist: " + key)
 		return Item{}, false
 	}
 

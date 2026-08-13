@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
@@ -22,11 +23,10 @@ var Mu = sync.Mutex{}
 var tmpCommandData [][][]byte
 
 func HandleMultipleCommands(client *utils.NewClient,buf []byte, n int) ([][][]byte,int,error){
-	fmt.Println("Iter: ", len(tmpCommandData))
 	tokens , till , err := DecodeArrayString(client.Buffer,len(client.Buffer))
 	if err != nil{
 		if err == ErrIncompleteRESP {
-			fmt.Println("Erro:",err)
+			logger.ErrorLog("RESP: incomplete command received")
 			return nil, 0 , err
 		}
 		return nil, till, errors.New("Incorrect RESP command") 
@@ -54,7 +54,7 @@ func ReadAndHandleConnection(client *utils.NewClient) {
 	for {
 		n, err := client.Conn.Read(buf)
 		if err != nil {
-			fmt.Println("Err:", err.Error(), " Client: ", client.Conn)
+			logger.ErrorLog("RESP: connection read error for client " + fmt.Sprintf("%v", client.Conn.RemoteAddr()) + ": " + err.Error())
 			break
 		}
 
@@ -105,7 +105,7 @@ func ExecuteTokens(client *utils.NewClient,allTokenList [][][]byte , n int) {
 				var input *RedisInput
 
 				if len(tokens) >= 2 {
-					fmt.Println("Token 0:", string(tokens[0]), tokens[0])
+					logger.InfoLog("RESP: executing command " + string(tokens[0]))
 					input = &RedisInput{
 						Cmd:     string(tokens[0]),
 						Args:    bytesSliceToStrings(tokens[1:]),
@@ -161,10 +161,10 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 
 
 
-	fmt.Println("Input:", input)	
+	logger.InfoLog("RESP: parseCommand received: " + input.Cmd)
 	switch strings.ToLower(input.Cmd){
 		case "ping":
-			fmt.Println("Executing ping", input.Args)
+			logger.InfoLog("RESP: ping")
 			if client.Mode.Name == utils.ModeSubsriber.Name{
 					if len(input.Args) != 1 {
 						encode , _:= EncodeSimpleError("ERR wrong number of arguments for 'ping' command")
@@ -178,83 +178,83 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 			val := ExecutePing(input.Args)
 			client.Conn.Write([]byte(val))
 		case "client":
-			fmt.Println("Executing Client ",input.Args[0])
+			logger.InfoLog("RESP: client " + input.Args[0])
 			data := ExecuteClientname(input.Args,client)
 			client.Conn.Write([]byte(data))
 		case "set":
-			fmt.Println("Executing set , args: ", input.RawArgs)
+			logger.InfoLog("RESP: set key=" + input.Args[0])
 			data :=ExecuteSet(input , client)
 			client.Conn.Write([]byte(data.(string)))
 		case "get":
-			fmt.Println("Executing get")
+			logger.InfoLog("RESP: get key=" + input.Args[0])
 			data := ExecuteGet(input.Args)
 			client.Conn.Write(data)
 		case "del":
-			fmt.Println("Executing delete")
+			logger.InfoLog("RESP: del")
 			data := ExecuteDel(input.Args)
 			client.Conn.Write([]byte(data))
 		case "keys":
-			fmt.Println("Executing Keys")
+			logger.InfoLog("RESP: keys")
 			data := Executekeys(input.Args)
 			client.Conn.Write([]byte(data))
 		case "exists":
-			fmt.Println("Executing exists")
+			logger.InfoLog("RESP: exists")
 			data := ExecuteExists(input.Args)
 			client.Conn.Write([]byte(data))
 		case "save":
-			fmt.Println("Executing save")
+			logger.InfoLog("RESP: save")
 			val := ExecuteSave()
 			client.Conn.Write([]byte(val))
 		case "expire":
-			fmt.Println("executing Expire")
+			logger.InfoLog("RESP: expire")
 			val := ExecuteExpire(input.RawArgs,client)
 			client.Conn.Write([]byte(val))
 		case "flushdb":
-			fmt.Println("Executing Flush")
+			logger.InfoLog("RESP: flushdb")
 			val := ExecuteFlushDB()
 			client.Conn.Write([]byte(val))
 		case "echo":
-			fmt.Println("Executing echo")
+			logger.InfoLog("RESP: echo")
 			val := ExecuteEcho(input.Args)
 			client.Conn.Write([]byte(val))
 		case "ttl":
-			fmt.Println("Executing ttl")
+			logger.InfoLog("RESP: ttl")
 			val := ExecuteTTL(input.Args)
 			client.Conn.Write([]byte(val))
 		case "persist":
-			fmt.Println("Executing persist")
+			logger.InfoLog("RESP: persist")
 			val := ExecutePersistance(input.Args, client)
 			client.Conn.Write([]byte(val))
 		case "dbsize":
-			fmt.Println("Executing dbsize")
+			logger.InfoLog("RESP: dbsize")
 			val := ExecuteDbSize()
 			client.Conn.Write([]byte(val))
 		case "randomkey":
-			fmt.Println("Executing randomkey")
+			logger.InfoLog("RESP: randomkey")
 			val := ExecuteRandomKeys()
 			client.Conn.Write([]byte(val))
 		case "rename":
-			fmt.Println("Executing rename")
+			logger.InfoLog("RESP: rename")
 			val := ExecuteRenameKey(input.Args, client)
 			client.Conn.Write([]byte(val))
 		case "uptime":
-			fmt.Println("Executing uptime")
+			logger.InfoLog("RESP: uptime")
 			val := ExecuteServerUpTime(input.Args)
 			client.Conn.Write([]byte(val))
 		case "mget":
-			fmt.Println("Executing mget")
+			logger.InfoLog("RESP: mget")
 			val := ExecuteMget(input.Args)
 			client.Conn.Write([]byte(val))
 		case "incr", "decr", "incrby", "decrby":
-			fmt.Println("Executing integer operation")
+			logger.InfoLog("RESP: integer op " + input.Cmd)
 			val := ExecuteIntOpration(input.Cmd, input.Args, client)
 			client.Conn.Write([]byte(val))
 		case "strlen":
-			fmt.Println("Executing strlen")
+			logger.InfoLog("RESP: strlen")
 			val := ExecuteStrLen(input.Args)
 			client.Conn.Write([]byte(val))
 		case "command":
-			fmt.Println("Executed command")
+			logger.InfoLog("RESP: command")
 			if len(input.Args) <= 1 {
 				if len(input.Args) == 1 && strings.ToLower(input.Args[0]) == "docs"{
 					data := ExecuteCommandDocs()
@@ -282,7 +282,7 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 				UnsubscribeHandler(input.Args,client)
 			}
 			if input.Cmd =="publish"{
-				fmt.Println("Pubslihing shit:", input.Args)
+				logger.InfoLog("RESP: publish to topic " + input.Args[0])
 				data :=PublishHandler(input.Args,client)
 				client.Conn.Write([]byte(data))
 			}
@@ -298,18 +298,18 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 			}
 
 		case "quit":
-			fmt.Println("executing quit")
+			logger.InfoLog("RESP: quit")
 			ExecuteQuit(client)
 		case "reset":
-			fmt.Println("executing reset")
+			logger.InfoLog("RESP: reset")
 			data := ExecuteReset(client)
 			client.Conn.Write([]byte(data))
 		case "lastsave":
-			fmt.Println("Executing LastSave")
+			logger.InfoLog("RESP: lastsave")
 			data := ExecuteLastSave()
 			client.Conn.Write([]byte(data))
 		case "monitor":
-			fmt.Println("Executing history")
+			logger.InfoLog("RESP: monitor/history")
 			data := ExecuteHistory(input.Args)		
 			for _, line := range data {
 				data , _ := EncodeBulkString(line)
@@ -317,12 +317,12 @@ func parseCommand(input *RedisInput, client *utils.NewClient) {
 				client.Conn.Write([]byte(data))
 			}
 		case "select":
-			fmt.Println("Executing select database space:", input.Args)
+			logger.InfoLog("RESP: select database space: " + fmt.Sprintf("%v", input.Args))
 			// Return OK to satisfy connection setup workflows
 			client.Conn.Write([]byte("+OK\r\n"))
 
 		default:
-			fmt.Println("None Command found")
+			logger.ErrorLog("RESP: unknown command " + input.Cmd)
 			client.Conn.Write([]byte("-No such command found\r\n"))
 
 	}

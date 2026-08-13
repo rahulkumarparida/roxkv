@@ -1,9 +1,9 @@
 package redisparser
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/pubsub"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
@@ -24,7 +24,7 @@ func PtopicChecker(topic *pubsub.SubrChannel) ([]string,bool){
 
 	for _, item := range PatternRegister{
 		if count , _ :=PatternChecker(item.Pattern,[]string{topic.Topic}); count >= 1{
-			fmt.Println("Matched: ", item.Pattern)
+			logger.InfoLog("PtopicChecker: pattern matched " + item.Pattern + " for topic " + topic.Topic)
 			data = append(data, item.Pattern)
 		}
 	}
@@ -43,7 +43,7 @@ func PatternChecker(input string, topics []string) (int,[]string){
 	}else if strings.Contains(input,"?"){
 		return  QuestionMarkPattern(input,topics)
 	}else if strings.Contains(input,"[") && strings.Contains(input,"]"){
-		fmt.Println("Executing [] Brackets")
+		logger.InfoLog("PatternChecker: matching [] brackets pattern")
 		return CharacterMatchingPattern(input,topics)
 	}
 
@@ -149,12 +149,12 @@ func CharacterMatchingPattern(input string,topics []string) (int,[]string){
 	openBracIdx := strings.Index(input,"[")
 	closeBracIdx := strings.Index(input,"]")
 	requiredchar := input[openBracIdx:closeBracIdx]
-	fmt.Println("required:",requiredchar)
+	logger.InfoLog("CharacterMatchingPattern: required chars=" + requiredchar)
 	for _, topic := range topics {
 
 		for _, char := range requiredchar {
 			if (input[:openBracIdx]+string(char)+input[closeBracIdx+1:]) == topic{
-				fmt.Println("Topic Matched",topic)
+				logger.InfoLog("CharacterMatchingPattern: topic matched " + topic)
 				similarTopic = append(similarTopic, topic)
 			}
 		}

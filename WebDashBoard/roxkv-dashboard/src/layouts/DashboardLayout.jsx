@@ -1,14 +1,19 @@
+import React, { useState } from 'react';
 import { Settings, Globe, Zap, Bot } from 'lucide-react';
 import { APP_META } from '../utils/constants';
 import bgImage from '../assets/4.png';
+import AISettings from '../components/AISettings';
 
 /**
  * DashboardLayout provides the persistent shell with background image,
  * dark overlay, and status bar.
  */
 export default function DashboardLayout({ children }) {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   return (
     <div className="relative h-screen w-screen overflow-hidden">
+      <AISettings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       {/* Background Image */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -37,7 +42,7 @@ export default function DashboardLayout({ children }) {
 
             {/* Center: Quick Icons */}
             <div className="flex items-center gap-3 text-text-muted">
-              <button className="hover:text-purple-400 transition-colors p-1"><Settings className="h-3 w-3" /></button>
+              <button onClick={() => setIsSettingsOpen(true)} className="hover:text-purple-400 transition-colors p-1"><Settings className="h-3 w-3" /></button>
               <button className="hover:text-purple-400 transition-colors p-1"><Globe className="h-3 w-3" /></button>
               <button className="hover:text-purple-400 transition-colors p-1"><Zap className="h-3 w-3" /></button>
               <button className="hover:text-purple-400 transition-colors p-1"><Bot className="h-3 w-3" /></button>

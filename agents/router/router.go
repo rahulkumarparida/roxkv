@@ -4,13 +4,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/agents/registry"
 )
 
 // DefaultMaxTools is the maximum number of tools returned when routing
 // finds matches. It keeps the LLM context lean for small models.
-const DefaultMaxTools = 10
+const DefaultMaxTools = 5
 
 // stopWords are common words excluded from query matching to avoid
 // noise in the scoring process.
@@ -46,7 +46,7 @@ type scoredTool struct {
 //   - Partial substring matches:   +1
 //   - Example phrase word overlap:  +2 × (priority/10)
 //   - Category name in query:       +1
-func RouteTools(query string, allMeta []registry.ToolMetadata, maxTools int) []api.Tool {
+func RouteTools(query string, allMeta []registry.ToolMetadata, maxTools int) []abstractor.GenericToolDefinition {
 	if maxTools <= 0 {
 		maxTools = DefaultMaxTools
 	}
@@ -83,7 +83,7 @@ func RouteTools(query string, allMeta []registry.ToolMetadata, maxTools int) []a
 		scored = scored[:maxTools]
 	}
 
-	tools := make([]api.Tool, 0, len(scored))
+	tools := make([]abstractor.GenericToolDefinition, 0, len(scored))
 	for _, s := range scored {
 		tools = append(tools, s.meta.Tool)
 	}
@@ -167,9 +167,9 @@ func tokenize(text string) []string {
 	return words
 }
 
-// extractTools converts a metadata slice into an api.Tool slice.
-func extractTools(metas []registry.ToolMetadata) []api.Tool {
-	tools := make([]api.Tool, 0, len(metas))
+// extractTools converts a metadata slice into an abstractor.GenericToolDefinition slice.
+func extractTools(metas []registry.ToolMetadata) []abstractor.GenericToolDefinition {
+	tools := make([]abstractor.GenericToolDefinition, 0, len(metas))
 	for _, m := range metas {
 		tools = append(tools, m.Tool)
 	}

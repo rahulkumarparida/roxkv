@@ -1,0 +1,12 @@
+//  Example of the main llm configuration used and saved to the  ~/.roxkv/roxconfig/  
+{
+    "provider": "ollama",
+    "model": "llama3.2:3b",
+    "endpoint": "http://localhost:11434",
+    "apikey": "",
+    "temperature": 0.2,
+    "top_p": 0,
+    "max_tokens": 0,
+    "stream": false,
+    "timeout": 0
+}

@@ -1,65 +1,68 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
-	"github.com/ollama/ollama/api"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/internal/logger"
 	redisparser "github.com/rahulkumarparida/roxkv/internal/resp-parser"
 	"github.com/rahulkumarparida/roxkv/internal/store"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
 
-func RespServer(stre *store.MemoryAlloc, agent *api.Client) {
+func RespServer(stre *store.MemoryAlloc, provider abstractor.Provider) error {
 
-	listner, err := net.Listen("tcp", ":6973")
+	listner, err := net.Listen("tcp", RespTCPAddr)
 
 	if err != nil {
-		fmt.Println("Server is busy and not listening at port 6973:\n", err)
-		logger.ErrorLog("error while connecting to the TCP server, port 6973 is busy")
-		return
+		return fmt.Errorf("start RESP server on %s: %w", RespTCPAddr, err)
 	}
-	defer listner.Close()
+	fmt.Println("Listening Resp-Server at localhost" + RespTCPAddr)
+	startupLog("server ports", "RESP TCP "+RespTCPAddr)
 
-	fmt.Println("Listening Resp-Server at localhost:6973")
+	go func() {
+		defer listner.Close()
 
-	for {
+		for {
+			conn, err := listner.Accept()
 
-		conn, err := listner.Accept()
+			if err != nil {
+				if errors.Is(err, net.ErrClosed) {
+					return
+				}
+				logger.ErrorLog("RESP TCP connection accept error: " + err.Error())
+				continue
+			}
 
-		if err != nil {
-			fmt.Println("Connection could not be established:", err)
-			logger.ErrorLog("Connection failed could not be established")
-			continue
+			client := *utils.CreateClient(conn, "client")
+
+			mutex.Lock()
+			client.Initiator = utils.RedisSource
+			if len(utils.TotalConnecntions) > MaxConnections {
+				data := redisparser.EncodeBulkBytes([]byte("Max connections from the TCP server exceeded"))
+				client.Conn.Write(data)
+				client.Conn.Close()
+				mutex.Unlock()
+				continue
+			}
+			utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
+			mutex.Unlock()
+			logger.InfoLog("New RESP client connected: " + fmt.Sprintf("%v", client.ID))
+			go HandleRespConnections(&client, stre, provider)
 		}
+	}()
 
-		client := *utils.CreateClient(conn, "client")
-
-		mutex.Lock()
-		if len(utils.TotalConnecntions) > MaxConnections {
-			data := redisparser.EncodeBulkBytes([]byte("Max connections from the TCP server exceeded"))
-			client.Conn.Write(data)
-			client.Conn.Close()
-			continue
-		}
-		utils.TotalConnecntions = append(utils.TotalConnecntions, &client)
-		mutex.Unlock()
-		fmt.Println("Connected: ", client.ID)
-		go HandleRespConnections(&client, stre, agent)
-
-	}
-
+	return nil
 }
 
-func HandleRespConnections(client *utils.NewClient, stre *store.MemoryAlloc, agent *api.Client) {
+func HandleRespConnections(client *utils.NewClient, stre *store.MemoryAlloc, provider abstractor.Provider) {
 
 	logger.InfoLog("Resp Client connected: " + client.ID.(string))
 
-
 	defer client.Conn.Close()
 
-
 	redisparser.ReadAndHandleConnection(client)
-	
+
 }

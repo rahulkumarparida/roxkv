@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ollama/ollama/api"
 	"github.com/rahulkumarparida/roxkv/agents"
+	"github.com/rahulkumarparida/roxkv/agents/abstractor"
 	"github.com/rahulkumarparida/roxkv/agents/registry"
 	"github.com/rahulkumarparida/roxkv/agents/router"
 	"github.com/rahulkumarparida/roxkv/internal/commands"
@@ -21,7 +20,7 @@ import (
 )
 
 type masterToolQueryArgs struct {
-	Query string `json:"query"`
+	Query []string `json:"query"`
 }
 
 // Pubsub
@@ -112,14 +111,13 @@ You are aware that every tool represents a capability of RoxKV. Your job is to c
 
 Your goal is to help users interact with RoxKV naturally, accurately, and safely.`
 
-func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, client *api.Client) any {
+func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, provider abstractor.Provider) any {
 	logger.InfoLog("Master Agent called with query: " + query)
 	ctx := context.Background()
 	session := agents.GetSession("masteragent", masterSystemPrompt, user)
-	// Route tools: score every registered tool against the user query
-	// and expose only the relevant subset to the LLM.
+	// Narrowing of tools
 	tools := router.RouteTools(query, registry.AllMetadata(), router.DefaultMaxTools)
-	var finalizedTools []api.Tool
+	var finalizedTools []abstractor.GenericToolDefinition
 	if len(tools) > 6 {
 
 		finalizedTools = tools[1:6]
@@ -127,34 +125,35 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, c
 		finalizedTools = tools
 	}
 
-	fmt.Println("Sending it to the session runner with total ", len(tools), " tools-->")
-	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, client, agents.AGENT_USED, query, finalizedTools, MasterInference)
+	modelName := ""
+	if activeCfg := abstractor.GetConfig(); activeCfg != nil {
+		modelName = activeCfg.Model
+	}
+
+	logger.InfoLog("Routing to session runner with " + fmt.Sprintf("%d", len(tools)) + " tools")
+	toolsToExecute, assistantTextResponse, cerr := session.Run(ctx, provider, modelName, query, finalizedTools, MasterInference)
 
 	if cerr != nil {
-		log.Fatalf("Master orchestrator API call failed: %v", cerr)
+		logger.ErrorLog("[MasterAgent] Orchestrator LLM call error: " + cerr.Error())
+		return cerr.Error()
 	}
 
 	if len(toolsToExecute) > 0 {
-		var rawReplies []string
+		logger.InfoLog("Executing " + fmt.Sprintf("%d", len(toolsToExecute)) + " tool(s): " + toolsToExecute[0].Name)
+		var rawReplies []abstractor.GenericToolResult
 		var specialistReplies []string
 		for _, tool := range toolsToExecute {
-			fmt.Println("Executing: ", tool)
+			logger.InfoLog("Dispatching tool: " + tool.Name)
 
-			argsByte, _ := json.Marshal(tool.Function.Arguments)
+			argsByte, _ := json.Marshal(tool.Arguments)
 
 			var args masterToolQueryArgs
 			_ = json.Unmarshal(argsByte, &args)
-			fmt.Println("Arguments Here :", args)
 
-			queryText := strings.TrimSpace(args.Query)
-
-			if queryText == "" {
-				queryText = "Please inspect the relevant state for this request."
-			}
 
 			var response any
 
-			switch tool.Function.Name {
+			switch tool.Name {
 			case "get":
 				var args struct {
 					Key string `json:"key"`
@@ -306,16 +305,24 @@ func MasterAgent(query string, stre *store.MemoryAlloc, user *utils.NewClient, c
 			if response == "" {
 				response = "No specialist response was produced."
 			}
-			data := fmt.Sprintf("%v", response)
-			fmt.Println("Data Appended: ", data)
+			data := abstractor.GenericToolResult{
+				ID: tool.ID,
+				Name: tool.Name,
+				Content: []string{response.(string)},
+			}
+			logger.InfoLog("Tool result collected for: " + tool.Name)
 			rawReplies = append(rawReplies, data)
-			specialistReplies = append(specialistReplies, fmt.Sprintf("[%s]\n%s", tool.Function.Name, response))
+			specialistReplies = append(specialistReplies, fmt.Sprintf("[%s]\n%s", tool.Name, response))
 		}
 		session.AppendToolResults(rawReplies...)
 
-		_, finalText, cerr := session.Run(ctx, client, agents.AGENT_USED, "Synthesize the worker outputs into the final user-facing answer. Interpret raw execution data, highlight the result that matters, and keep the reply concise unless the user requested deeper analysis.", nil, MasterInference)
+		_, finalText, cerr := session.Run(ctx, provider, modelName, "Synthesize the worker outputs into the final user-facing answer. Interpret raw execution data, highlight the result that matters, and keep the reply concise unless the user requested deeper analysis.", nil, MasterInference)
 		if cerr != nil {
-			log.Fatalf("Master analysis request failed: %v", cerr)
+			logger.ErrorLog("[MasterAgent] Analysis LLM request error: " + cerr.Error())
+			if len(specialistReplies) > 0 {
+				return strings.Join(specialistReplies, "\n\n")
+			}
+			return cerr.Error()
 		}
 
 		if strings.TrimSpace(finalText) != "" {

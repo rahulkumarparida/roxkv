@@ -12,6 +12,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    build: {
+      outDir: '../../server/dashboard/dist',
+      emptyOutDir: true,
+    },
     server: {
       host: '0.0.0.0',
       port,
@@ -25,6 +29,14 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
         '/api/chat': {
+          target: chatApiBaseUrl,
+          changeOrigin: true,
+        },
+        '/providers': {
+          target: chatApiBaseUrl,
+          changeOrigin: true,
+        },
+        '/api/providers': {
           target: chatApiBaseUrl,
           changeOrigin: true,
         },

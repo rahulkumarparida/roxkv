@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/rahulkumarparida/roxkv/internal/logger"
 	"github.com/rahulkumarparida/roxkv/internal/pubsub"
 	"github.com/rahulkumarparida/roxkv/internal/utils"
 )
@@ -26,13 +27,13 @@ func SubscribeHandler(args []string,client *utils.NewClient){
 			client.Mode.Topic = append(client.Mode.Topic, arg)			
 			data := []any{"subscribe",arg,len(client.Mode.Topic)}
 			encode , _ = EncodeArray(data)
-			fmt.Println("Encoded Subscribe:",encode)
+			logger.InfoLog("SubscribeHandler: client " + fmt.Sprintf("%v", client.ID) + " subscribed to " + arg)
 			client.Conn.Write([]byte(encode))
 		}
 	}
 
 
-	fmt.Println("Client Mode:",client.Mode)
+	logger.InfoLog("SubscribeHandler: client " + fmt.Sprintf("%v", client.ID) + " mode=" + client.Mode.Name)
 
 
 	
@@ -168,7 +169,7 @@ func UnsubscribeHandler(args []string,client *utils.NewClient){
 			
 			endata := []any{"unsubscribe",arg,len(client.Mode.Topic)}
 			encode , _ = EncodeArray(endata) 
-			fmt.Println("Encoded Unsubscribe:",encode)
+			logger.InfoLog("UnsubscribeHandler: client " + fmt.Sprintf("%v", client.ID) + " unsubscribed from " + arg)
 			client.Conn.Write([]byte(encode))
 
 		}else{
@@ -183,7 +184,7 @@ func UnsubscribeHandler(args []string,client *utils.NewClient){
 
 	}
 
-	fmt.Println("Client Mode:",client.Mode)
+	logger.InfoLog("UnsubscribeHandler: client " + fmt.Sprintf("%v", client.ID) + " mode=" + client.Mode.Name)
 
 	if len(client.Mode.Topic) == 0{
 		client.Mode = utils.ModeDefault
@@ -217,7 +218,7 @@ func PSubscribeHandler(args []string,client *utils.NewClient){
 		client.Mode.PTopic = append(client.Mode.PTopic, ptopic)
 		data := []any{"psubscribe",ptopic,len(client.Mode.PTopic)}
 		encode , _ := EncodeArray(data)
-		fmt.Println("Encoded Subscribe:",encode)
+		logger.InfoLog("PSubscribeHandler: client " + fmt.Sprintf("%v", client.ID) + " psubscribed to " + ptopic)
 		client.Conn.Write([]byte(encode))
 	}
 

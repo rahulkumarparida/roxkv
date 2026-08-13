@@ -158,6 +158,11 @@ func Broker(client *utils.NewClient, topic string, msg string) {
 		if sub == client {
 			continue
 		}else{
+			logger.InfoLog("Pubsub: delivering message to subscriber " + sub.Conn.RemoteAddr().String())
+			if client.Initiator == utils.RedisSource {
+				continue
+			}
+
 			channel.Wg.Add(1)
 			go DeliverMessage(sub, "roxkv> " +msg+"\n", &channel.Wg)
 		}	
@@ -233,6 +238,7 @@ func CloseChannel(client *utils.NewClient, topic string) {
 func PublishToAllTopics(client *utils.NewClient, message string) string {
 
 	if client.Role != string(utils.RoleSystem) && client.Role != string(utils.RoleAdmin) {
+		logger.ErrorLog("Pubsub: client " + client.Role + " is not allowed to publish everywhere")
 		return ""
 	}
 	logger.InfoLog(" " + client.Role + " : Broadcasted a message across all topics")

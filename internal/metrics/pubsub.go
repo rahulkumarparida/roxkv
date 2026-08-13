@@ -189,7 +189,7 @@ func BroadcastToTopic(client *utils.NewClient, topic string, msg string) bool {
 }
 
 func BroadcastEverywhere(client *utils.NewClient, msg string) bool {
-	if client.Role != string(utils.RoleSystem) {
+	if client.Role == string(utils.RoleClient){
 		return false
 	}
 

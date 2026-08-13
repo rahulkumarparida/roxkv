@@ -3,7 +3,6 @@ package persistence
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -22,7 +21,7 @@ func CreateFile(data any, absoluteFilePath string) bool {
 	}
 
 	defer datafile.Close()
-	fmt.Println("DataCreations: ", data)
+	logger.InfoLog("Creating persistence file: " + absoluteFilePath)
 	databytes, err := json.MarshalIndent(data, "", "  ")
 	if utils.HandleError("Error while Marshaling file: ", err) {
 		return false
@@ -106,7 +105,7 @@ func StoreToJson(dbFolder string, filename string, data any) bool {
 	} else {
 		allData = data
 	}
-	fmt.Println("DataRecieved: ", allData)
+	logger.InfoLog("Persisting data to: " + KeyfolderName)
 	val := CreateFile(allData, KeyfolderName)
 
 	return val
@@ -143,7 +142,7 @@ func LoadJsons(dbFolder string, ms *store.MemoryAlloc) int {
 
 	count := 1
 	if len(dbFolder) == 0 {
-		fmt.Println("Home directory not found")
+		logger.ErrorLog("LoadJsons: db folder path is empty, cannot load data")
 		return count
 	}
 
@@ -164,7 +163,7 @@ func LoadJsons(dbFolder string, ms *store.MemoryAlloc) int {
 			continue
 		}
 
-		fmt.Println("Executing: ", file.Name())
+		logger.InfoLog("Loading persistence file: " + file.Name())
 		filePath := filepath.Join(dbFolder, file.Name())
 
 		databytes, err := os.ReadFile(filePath)
@@ -181,7 +180,7 @@ func LoadJsons(dbFolder string, ms *store.MemoryAlloc) int {
 
 	for _, val := range dataArr {
 		store.SetKv(ms, &val)
-		fmt.Println("Val Set: ", val.Key)
+		logger.InfoLog("Loaded key from persistence: " + val.Key)
 	}
 
 	return count

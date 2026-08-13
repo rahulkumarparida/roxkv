@@ -8,6 +8,7 @@ mkdir -p \
   "${ROXKV_HOME}/roxdb" \
   "${ROXKV_HOME}/roxlogs" \
   "${ROXKV_HOME}/roxsnaps" \
-  "${ROXKV_HOME}/roxmetrics"
+  "${ROXKV_HOME}/roxmetrics" \
+  "${ROXKV_HOME}/roxconfig"
 
 exec "$@"
