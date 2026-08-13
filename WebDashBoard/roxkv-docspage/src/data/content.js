@@ -165,13 +165,13 @@ export const techStack = [
 
 // ─── Demo ───────────────────────────────────────────────────────────────────
 export const demo = {
-  heading: 'RoxAI Is Under Active Development',
+  heading: 'RoxAI Features Showcase',
   description:
-    'The live demo experience is still being refined. RoxAI is under continuous development, with ongoing work focused on making the orchestration flow more robust, improving reliability across tool execution paths, tightening edge-case handling, and polishing the end-to-end user experience before a full showcase is published.',
+    'RoxAI provides a robust orchestration layer that seamlessly translates natural language into direct database operations. Experience real-time monitoring and database administration through our interactive dashboard.',
   details: [
-    'The current focus is on strengthening the AI-to-tool execution pipeline so natural language requests behave more consistently under real usage.',
-    'Work is continuing on stability improvements, better error recovery, cleaner streaming responses, and stronger operational visibility throughout the system.',
-    'Rather than shipping a rushed demo section, this page now reflects that RoxAI is being actively improved to make the final experience more dependable, more accurate, and more production-ready.',
+    'The AI-to-tool execution pipeline reliably processes natural language queries to execute complex administrative tasks.',
+    'It features intelligent error recovery, instantaneous server-sent events for streaming, and extensive observability.',
+    'Built for stability, RoxAI offers a fully production-ready, local-first database experience.',
   ],
 };
 
@@ -188,17 +188,37 @@ export const github = {
   profileUrl: 'https://github.com/rahulkumarparida/',
 };
 
-// ─── Run Locally ────────────────────────────────────────────────────────────
+// ─── Installation ────────────────────────────────────────────────────────────
 export const runLocally = {
-  heading: 'Run Locally',
-  description: 'Get RoxAI running on your machine in under a minute. The AI backend uses Ollama locally — no API keys required.',
-  steps: [
-    { label: 'Clone the repository', command: 'git clone https://github.com/rahulkumarparida/roxkv.git && cd roxkv' },
-    { label: 'Start with Docker Compose', command: 'docker-compose up --build' },
-    { label: 'Open the dashboard', command: 'open http://localhost:5173' },
-    { label: 'Or connect via CLI', command: 'go run ./cli/cli.go' },
+  heading: 'Installation',
+  description: 'Get RoxAI running on your machine using your preferred method. The AI backend uses Ollama locally — no API keys required.',
+  methods: [
+    {
+      name: 'Docker (Recommended)',
+      steps: [
+        { label: 'Clone the repository', command: 'git clone https://github.com/rahulkumarparida/roxkv.git && cd roxkv' },
+        { label: 'Copy env file', command: 'cp .env.example .env' },
+        { label: 'Start with Docker Compose', command: 'docker compose up -d --build' },
+      ]
+    },
+    {
+      name: 'Manual Build',
+      steps: [
+        { label: 'Clone the repository', command: 'git clone https://github.com/rahulkumarparida/roxkv.git && cd roxkv' },
+        { label: 'Start the RoxKV server', command: 'go run ./cmd/roxkv roxkv-tcp' },
+        { label: 'Start the Dashboard', command: 'cd WebDashBoard/roxkv-dashboard && npm install && npm run dev' },
+      ]
+    },
+    {
+      name: 'Pre-built Binaries',
+      steps: [
+        { label: 'Clone the repository', command: 'git clone https://github.com/rahulkumarparida/roxkv.git && cd roxkv' },
+        { label: 'Make executable', command: 'chmod +x ./executable/roxkv' },
+        { label: 'Run the binary', command: './executable/roxkv roxkv-tcp' },
+      ]
+    }
   ],
-  note: 'Ollama runs locally inside Docker with the qwen3:1.7b model. No cloud APIs, full privacy.',
+  note: 'Ollama runs locally inside Docker with the llama3.1 model. Ensure Ollama is running if not using Docker.',
 };
 
 // ─── Gallery ────────────────────────────────────────────────────────────────
@@ -209,16 +229,7 @@ export const gallery = [
   { id: 'monitoring', label: 'Monitoring', description: 'Live operational metrics for CPU, memory, and runtime activity.' },
 ];
 
-// ─── Roadmap ────────────────────────────────────────────────────────────────
-export const roadmap = [
-  { title: 'Redis Protocol', description: 'Full RESP protocol compatibility for drop-in Redis client support.', status: 'planned' },
-  { title: 'Distributed Storage', description: 'Shard data across multiple nodes with consistent hashing.', status: 'planned' },
-  { title: 'Authentication', description: 'Token-based auth with user management and session handling.', status: 'planned' },
-  { title: 'Role Based Access', description: 'Fine-grained RBAC for read, write, admin, and tool-level permissions.', status: 'planned' },
-  { title: 'Historical Analytics', description: 'Time-series storage of metrics for trend analysis and anomaly detection.', status: 'planned' },
-  { title: 'Smarter Planning', description: 'Multi-step query planning with tool chaining and dependency resolution.', status: 'planned' },
-  { title: 'Cluster Support', description: 'Multi-node cluster with leader election and automatic failover.', status: 'planned' },
-];
+// ─── Roadmap removed as features are completed ────────────────────────────────
 
 // ─── About ──────────────────────────────────────────────────────────────────
 export const about = {

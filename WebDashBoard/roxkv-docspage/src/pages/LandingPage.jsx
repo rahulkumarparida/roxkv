@@ -12,7 +12,6 @@ import Demo from '../components/Demo';
 import GitHub from '../components/GitHub';
 import RunLocally from '../components/RunLocally';
 import Gallery from '../components/Gallery';
-import Roadmap from '../components/Roadmap';
 import About from '../components/About';
 import Footer from '../components/Footer';
 
@@ -57,9 +56,6 @@ export default function LandingPage() {
 
       <div className="section-divider" />
       <Gallery />
-
-      <div className="section-divider" />
-      <Roadmap />
 
       <div className="section-divider" />
       <About />
