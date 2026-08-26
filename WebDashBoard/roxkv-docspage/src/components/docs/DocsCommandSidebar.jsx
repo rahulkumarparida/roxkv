@@ -25,7 +25,7 @@ export default function DocsCommandSidebar() {
             </h4>
             <ul className="space-y-1">
               {cmds.map((cmd) => {
-                const cmdPath = `/docs/commands/${cmd.name.toLowerCase()}`;
+                const cmdPath = `/docs/roxkv/commands/${cmd.name.toLowerCase()}`;
                 const isActive = location.pathname === cmdPath;
                 
                 return (

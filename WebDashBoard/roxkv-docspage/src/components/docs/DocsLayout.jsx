@@ -4,10 +4,12 @@ import DocsSidebar from './DocsSidebar';
 import DocsRightSidebar from './DocsRightSidebar';
 import DocsCommandSidebar from './DocsCommandSidebar';
 import SearchPalette from './SearchPalette';
+import SectionSwitcher from './SectionSwitcher';
 
 export default function DocsLayout() {
   const location = useLocation();
-  const isCommandRoute = location.pathname.startsWith('/docs/commands');
+  const isCommandRoute = location.pathname.includes('/commands/') || location.pathname.endsWith('/commands');
+  const isCommandDetailRoute = location.pathname.match(/\/commands\/[^/]+$/);
   
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-[#f1f1f4] flex flex-col">
@@ -17,7 +19,7 @@ export default function DocsLayout() {
         <DocsSidebar />
         
         {/* Conditional Command Sidebar */}
-        {isCommandRoute && <DocsCommandSidebar />}
+        {isCommandDetailRoute && <DocsCommandSidebar />}
         
         {/* Main Content Area */}
         <main className="flex-1 min-w-0 py-10 px-6 sm:px-10 lg:pl-12 lg:pr-8">

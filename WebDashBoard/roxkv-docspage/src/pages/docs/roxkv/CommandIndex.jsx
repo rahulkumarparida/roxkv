@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { commands } from '../../data/commands';
+import { commands } from '../../../data/commands';
 
 export default function CommandIndex() {
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -46,7 +46,7 @@ export default function CommandIndex() {
           {filteredCommands.map(cmd => (
             <Link 
               key={cmd.name}
-              to={`/docs/commands/${cmd.name.toLowerCase()}`}
+              to={`/docs/roxkv/commands/${cmd.name.toLowerCase()}`}
               className="group bg-[#16161f] border border-[#1e1e2e] p-5 rounded-xl hover:border-[rgba(124,58,237,0.5)] hover:bg-[rgba(124,58,237,0.02)] transition-all block"
             >
               <div className="flex justify-between items-start mb-2">

@@ -25,7 +25,7 @@ export default function CommandDropdown() {
 
   const handleSelect = (cmdName) => {
     setIsOpen(false);
-    navigate(`/docs/commands/${cmdName.toLowerCase()}`);
+    navigate(`/docs/roxkv/commands/${cmdName.toLowerCase()}`);
   };
 
   return (

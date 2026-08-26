@@ -1,5 +1,5 @@
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { commands } from '../../data/commands';
+import { commands } from '../../../data/commands';
 import { ArrowLeft } from 'lucide-react';
 
 export default function CommandPage() {
@@ -8,13 +8,13 @@ export default function CommandPage() {
   const commandData = commands.find(c => c.name.toLowerCase() === cmd?.toLowerCase());
 
   if (!commandData) {
-    return <Navigate to="/docs/commands" replace />;
+    return <Navigate to="/docs/roxkv/commands" replace />;
   }
 
   return (
     <div className="space-y-8 pb-10">
       <div>
-        <Link to="/docs/commands" className="inline-flex items-center text-sm text-[#9898ab] hover:text-[#a78bfa] transition-colors mb-6">
+        <Link to="/docs/roxkv/commands" className="inline-flex items-center text-sm text-[#9898ab] hover:text-[#a78bfa] transition-colors mb-6">
           <ArrowLeft className="w-4 h-4 mr-1" />
           Back to Commands
         </Link>
@@ -81,7 +81,7 @@ export default function CommandPage() {
               <span className="ml-4 text-xs text-[#9898ab]">redis-cli</span>
             </div>
             <div className="terminal-body bg-[#16161f] p-4 font-mono text-sm">
-              <div><span className="prompt">127.0.0.1:6379</span> <span className="command">{example}</span></div>
+              <div><span className="prompt">127.0.0.1:6973&gt;</span> <span className="command">{example}</span></div>
             </div>
           </div>
         ))}
@@ -90,7 +90,7 @@ export default function CommandPage() {
       {commandData.notes && (
         <>
           <h2 id="notes" className="text-2xl font-bold text-white mt-12 mb-4">Notes</h2>
-          <div className="bg-[rgba(124,58,237,0.05)] border-l-4 border-[#7c3aed] p-4">
+          <div className="bg-[rgba(124,58,237,0.05)] border-l-4 border-[#7c3aed] p-4 my-6">
             <p className="text-[#9898ab] text-sm">{commandData.notes}</p>
           </div>
         </>
@@ -103,7 +103,7 @@ export default function CommandPage() {
             {commandData.related.map(rel => (
               <Link 
                 key={rel} 
-                to={`/docs/commands/${rel.toLowerCase()}`}
+                to={`/docs/roxkv/commands/${rel.toLowerCase()}`}
                 className="px-3 py-1.5 rounded-lg border border-[#1e1e2e] bg-[#16161f] text-sm text-[#a78bfa] hover:border-[#7c3aed] transition-colors"
               >
                 {rel}

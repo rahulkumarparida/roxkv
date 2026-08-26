@@ -269,5 +269,6 @@ export const navigation = [
   { label: 'Tech Stack', href: '/#tech-stack' },
   { label: 'Demo', href: '/#demo' },
   { label: 'Run Locally', href: '/#run-locally' },
-  { label: 'Resp Docs', href: '/docs' },
+  { label: 'RoxKV Docs', href: '/docs/roxkv/overview' },
+  { label: 'RoxAI Docs', href: '/docs/roxai/overview' },
 ];

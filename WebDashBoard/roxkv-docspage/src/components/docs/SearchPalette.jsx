@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Command, X } from 'lucide-react';
 import { commands } from '../../data/commands';
+import { allDocPages } from '../../data/navigation';
 
 export default function SearchPalette() {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,10 +11,18 @@ export default function SearchPalette() {
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
-  const filteredCommands = commands.filter(cmd =>
-    cmd.name.toLowerCase().includes(query.toLowerCase()) ||
-    cmd.description.toLowerCase().includes(query.toLowerCase())
-  );
+  // Build combined search items
+  const allItems = [
+    ...allDocPages.map(p => ({ type: 'page', name: p.name, description: p.description, href: p.href, section: p.section })),
+    ...commands.map(c => ({ type: 'command', name: c.name, description: c.description, href: `/docs/roxkv/commands/${c.name.toLowerCase()}`, section: 'Command' })),
+  ];
+
+  const filteredItems = query.length === 0
+    ? allItems.slice(0, 15)
+    : allItems.filter(item =>
+        item.name.toLowerCase().includes(query.toLowerCase()) ||
+        item.description?.toLowerCase().includes(query.toLowerCase())
+      );
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -46,17 +55,24 @@ export default function SearchPalette() {
   const handleModalKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % filteredCommands.length);
+      setSelectedIndex((prev) => (prev + 1) % filteredItems.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+      setSelectedIndex((prev) => (prev - 1 + filteredItems.length) % filteredItems.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filteredCommands[selectedIndex]) {
-        navigate(`/docs/commands/${filteredCommands[selectedIndex].name.toLowerCase()}`);
+      if (filteredItems[selectedIndex]) {
+        navigate(filteredItems[selectedIndex].href);
         setIsOpen(false);
       }
     }
+  };
+
+  const sectionColors = {
+    'RoxKV': 'text-purple-400 bg-purple-500/10',
+    'RoxAI': 'text-blue-400 bg-blue-500/10',
+    'Command': 'text-emerald-400 bg-emerald-500/10',
+    'Overview': 'text-amber-400 bg-amber-500/10',
   };
 
   return (
@@ -97,7 +113,7 @@ export default function SearchPalette() {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleModalKeyDown}
                 className="flex-1 bg-transparent border-none text-[#f1f1f4] placeholder-[#5e5e73] focus:outline-none focus:ring-0 text-lg"
-                placeholder="Search commands..."
+                placeholder="Search docs & commands..."
               />
               <button onClick={() => setIsOpen(false)} className="text-[#9898ab] hover:text-white p-1">
                 <X className="w-5 h-5" />
@@ -106,12 +122,12 @@ export default function SearchPalette() {
 
             {/* Results */}
             <div className="overflow-y-auto p-2 scrollbar-thin">
-              {filteredCommands.length > 0 ? (
-                filteredCommands.map((cmd, index) => (
+              {filteredItems.length > 0 ? (
+                filteredItems.map((item, index) => (
                   <button
-                    key={cmd.name}
+                    key={`${item.type}-${item.name}`}
                     onClick={() => {
-                      navigate(`/docs/commands/${cmd.name.toLowerCase()}`);
+                      navigate(item.href);
                       setIsOpen(false);
                     }}
                     onMouseEnter={() => setSelectedIndex(index)}
@@ -122,21 +138,23 @@ export default function SearchPalette() {
                     }`}
                   >
                     <div>
-                      <h4 className={`font-mono text-base ${index === selectedIndex ? 'text-[#a78bfa]' : 'text-[#f1f1f4]'}`}>
-                        {cmd.name}
+                      <h4 className={`text-base ${item.type === 'command' ? 'font-mono' : 'font-medium'} ${index === selectedIndex ? 'text-[#a78bfa]' : 'text-[#f1f1f4]'}`}>
+                        {item.name}
                       </h4>
-                      <p className="text-[#9898ab] text-xs mt-1 truncate max-w-[300px] sm:max-w-[400px]">
-                        {cmd.description}
-                      </p>
+                      {item.description && (
+                        <p className="text-[#9898ab] text-xs mt-1 truncate max-w-[300px] sm:max-w-[400px]">
+                          {item.description}
+                        </p>
+                      )}
                     </div>
-                    <span className="text-xs px-2 py-1 bg-[#0a0a0f] rounded text-[#5e5e73]">
-                      {cmd.category}
+                    <span className={`text-xs px-2 py-1 rounded ${sectionColors[item.section] || 'bg-[#0a0a0f] text-[#5e5e73]'}`}>
+                      {item.section}
                     </span>
                   </button>
                 ))
               ) : (
                 <div className="py-12 text-center text-[#9898ab]">
-                  No commands found matching "{query}"
+                  No results found for "{query}"
                 </div>
               )}
             </div>
